@@ -33,7 +33,7 @@ are defined below.
 
 The syntax of a CNF formula in DIMACS format is:
 
-   <formula>     = { <comment> } "p cnf " <var-max> " " <num-cls> "\n" { <block> }
+   \<formula>     = { <comment> } "p cnf " <var-max> " " <num-cls> "\n" { <block> }
    <block>       = <comment> | <clause>
    <comment>     = "c " <anything> "\n"
    <clause>      = { <blank> }{ <lit> } "0"
