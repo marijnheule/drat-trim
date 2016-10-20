@@ -562,7 +562,7 @@ int parse (struct solver* S) {
   int del = 0, uni = 0;
   int *buffer, bsize;
 
-  do { tmp = fscanf (S->inputFile, " cnf %i %li \n", &S->nVars, &S->nClauses);  // Read the first line
+  do { tmp = fscanf (S->inputFile, " cnf %i %li \n", &S->nVars, &S->nClauses); // Read the first line
     if (tmp > 0 && tmp != EOF) break; tmp = fscanf (S->inputFile, "%*s\n"); }  // In case a commment line was found
   while (tmp != 2 && tmp != EOF);                                              // Skip it and read next line
   int nZeros = S->nClauses;
@@ -636,9 +636,11 @@ int parse (struct solver* S) {
     if (abs(lit) > S->nVars && !fileSwitchFlag) {
       printf("c illegal literal %i due to max var %i\n", lit, S->nVars); exit(0); }
     if (!lit) {
+      buffer[size] = 0;
       if (size == 0 && !fileSwitchFlag) retvalue = UNSAT;
       if (del && S->mode == BACKWARD_UNSAT && size <= 1)  {
-        printf("c WARNING: backward mode ignores deletion of unit clause "); printClause (buffer);
+        printf("c WARNING: backward mode ignores deletion of (pseudo) unit clause ");
+        printClause (buffer);
         del = 0; uni = 0; size = 0; continue; }
       int rem = buffer[0];
       buffer[ size ] = 0;
