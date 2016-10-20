@@ -158,15 +158,15 @@ the user about such a modification.
 Consider the following CNF formula in DIMACS format (with spacing to
 increase readability):
 
-   p cnf 4 8
-    1  2 -3 0
-   -1 -2  3 0
-    2  3 -4 0
-   -2 -3  4 0
-   -1 -3 -4 0
-    1  3  4 0
-   -1  2  4 0
-    1 -2 -4 0
+      p cnf 4 8
+       1  2 -3 0
+      -1 -2  3 0
+       2  3 -4 0
+      -2 -3  4 0
+      -1 -3 -4 0
+       1  3  4 0
+      -1  2  4 0
+       1 -2 -4 0
 
 A valid DRAT proof for the above formula is:
 
