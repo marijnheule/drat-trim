@@ -201,7 +201,7 @@ described in [2].
 
 NOTE: Here we describe a "binary format" for input proof files.
 
-##### Mapping DIMACS Literals to Unsigned Integers
+### Mapping DIMACS Literals to Unsigned Integers
 
 The first step of the binary encoding is mapping literals in the DIMACS format
 to unsigned integers. The following mapping function is used:
@@ -215,7 +215,7 @@ below.
                -8191   16383
                -8193   16387
 
-##### Variable-Byte Encoding of Unsigned Integers
+### Variable-Byte Encoding of Unsigned Integers
 
 Assume that 'w0, ..., wi' are 7-bit words, 'w1' to 'wi' all non zero and the
 unsigned number 'x' can be represented as
@@ -244,7 +244,7 @@ the sequence, or whether there are still more bytes to follow. Here are some exa
     2^28 - 1           ff ff ff 7f
     2^28 + 7           87 80 80 80 01
 
-###### Bringing it together
+### Bringing it together
 
 In the binary DRAT format, each clause consists of at least two bytes. The first
 byte expresses whether the lemma is added (character 'a' or 61 in hexadecimal) or
