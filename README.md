@@ -170,10 +170,10 @@ increase readability):
 
 A valid DRAT proof for the above formula is:
 
-         -1 0
-  d -1 2  4 0
-          2 0
-            0
+            -1 0
+     d -1 2  4 0
+             2 0
+               0
 
 The first step is to validate that the first clause in the proof “-1 0”
 has the RAT property with respect to F_{0} (the input formula). This RAT
@@ -270,9 +270,9 @@ Marijn Heule, The University of Texas at Austin, 2016.
 
 References:
 
-- [1] Nathan Wetzler, Marijn J.H. Heule and Warren A. Hunt (2014).
+1. Nathan Wetzler, Marijn J.H. Heule and Warren A. Hunt (2014).
     DRAT-trim: Efficient Checking and Trimming Using Expressive Clausal Proofs.
     In Theory and Applications of Satisfiability Testing - SAT 2014.
     Lecture Notes in Computer Science 8561, pp. 422-429, Springer.
-- [2] Marijn Heule, Warren A. Hunt Jr., and Nathan Wetzler (2013)
+2.  Marijn Heule, Warren A. Hunt Jr., and Nathan Wetzler (2013)
     Trimming while checking clausal proofs. FMCAD 2013: 181-188.
