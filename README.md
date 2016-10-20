@@ -33,14 +33,14 @@ are defined below.
 
 The syntax of a CNF formula in DIMACS format is:
 
-   <formula>     = { <comment> } "p cnf " <var-max> " " <num-cls> "\n" { <block> }
-   <block>       = <comment> | <clause>
-   <comment>     = "c " <anything> "\n"
-   <clause>      = { <blank> }{ \<lit> } "0"
-   <lit>         = <pos> <blank> | <neg> <blank>
-   <pos>         = "1" | "2" | .... | <max-idx>
-   <neg>         = "-" <pos>
-   <blank>       = " " | "\n" | "\t"
+    <formula>     = { <comment> } "p cnf " <var-max> " " <num-cls> "\n" { <block> }
+    <block>       = <comment> | <clause>
+    <comment>     = "c " <anything> "\n"
+    <clause>      = { <blank> }{ \<lit> } "0"
+    <lit>         = <pos> <blank> | <neg> <blank>
+    <pos>         = "1" | "2" | .... | <max-idx>
+    <neg>         = "-" <pos>
+    <blank>       = " " | "\n" | "\t"
 
 where '|' means choice, '{ ... }' is equivalent to the Kleene star
 operation (that is a finite number of repetitions including 0) and
