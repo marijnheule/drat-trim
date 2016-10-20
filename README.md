@@ -47,7 +47,7 @@ operation (that is a finite number of repetitions including 0) and
 `<max-idx>` is 2^31 - 1.
 
 In the first line of a DIMCAS formula, `<var-max>` should be at least
-as high as the largest `<pos>` used in the formula, while \<num-cls>
+as high as the largest `<pos>` used in the formula, while `<num-cls>`
 should equal the number of clauses in the formula. In case there
 exists a literal `<pos>` or `"-" <pos>`, such that `<pos>` is larger than
 `<var-max>`, then the formula is invalid. The formula is also invalid
@@ -78,7 +78,7 @@ influences the proof.
 
 A clausal proof is valid with respect to a given formula, if
 1) all clause addition steps are valid (details are below); and
-2) if the proof contains the empty clause (`0`).
+2) if the proof contains the empty clause `0`.
 
 The empty clause typically is the last clause of the proof file,
 because all lines after the empty clause are redundant and ignored.
