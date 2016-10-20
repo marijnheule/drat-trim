@@ -174,7 +174,7 @@ A valid DRAT proof for the above formula is:
              2 0
                0
 
-The first step is to validate that the first clause in the proof `“-1 0”`
+The first step is to validate that the first clause in the proof `-1 0`
 has the RAT property with respect to F_{0} (the input formula). This RAT
 check can be partitioned into three AT checks: there are three clauses
 containing the literal `1`: `1 2 -3 0`, `1 3 4 0` and `1 -2 -4 0`.
@@ -184,7 +184,7 @@ first AT check, UCP on the formula F_{0} + (1) + (-2) + (3) should result
 the empty clause. First, clause `-1 -3 -4 0` is reduced to the unit (-4).
 Now the clause `-1 2 4 0` is reduced to the empty clause.
 
-The RAT check of “-1 0” succeeds. Now “-1 0” will be added to the formula:
+The RAT check of `-1 0` succeeds. Now `-1 0` will be added to the formula:
 F_{1} = F_{0} + (-1).
 
 The second step is the removal of the clause `d -1 2 4 0`. Deletion steps
