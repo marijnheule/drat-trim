@@ -67,7 +67,7 @@ The syntax of a clausal proof in DRAT format is as follows:
     <blank>       = " " | "\n" | "\t"
 
 Notice that the syntax of the DIMACS and DRAT formats is equivalent
-for \<clause>, \<lit>, \<pos>, and \<neg>.
+for `<clause>`, `<lit>`, `<pos>`, and `<neg>`.
 
 However, DIMACS and DRAT files differ in their interpretation.
 Formulas in the DIMACS files are multi-sets of clauses. Hence,
@@ -88,7 +88,7 @@ because all lines after the empty clause are redundant and ignored.
 There are two restrictions regarding clauses in both the DIMACS
 and the DRAT formats. The first restriction is that no clause can
 be a tautology, i.e., contains a complementary set of literals.
-Hence if a clause contains \<lit> it cannot contain -\<lit> as well.
+Hence if a clause contains `<lit>` it cannot contain `"-" <lit>` as well.
 The second restriction is that clauses cannot contain duplicate
 literals. On the other hand, formulas are allowed to have
 duplicate clauses. Hence formulas are multi-sets of clauses.
@@ -174,10 +174,10 @@ A valid DRAT proof for the above formula is:
              2 0
                0
 
-The first step is to validate that the first clause in the proof “-1 0”
+The first step is to validate that the first clause in the proof `“-1 0”`
 has the RAT property with respect to F_{0} (the input formula). This RAT
 check can be partitioned into three AT checks: there are three clauses
-containing the literal “1”: “1 2 -3 0”, “1 3 4 0” and “1 -2 -4 0”.
+containing the literal “1”: `“1 2 -3 0”`, `“1 3 4 0”` and `“1 -2 -4 0”`.
 Following the description above, the RAT checks requires checking the AT
 check for the clauses “-1 2 -3 0”, “-1 3 4 0” and “-1 -2 -4 0”. For the
 first AT check, UCP on the formula F_{0} + (1) + (-2) + (3) should result
