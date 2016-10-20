@@ -36,7 +36,7 @@ The syntax of a CNF formula in DIMACS format is:
     <formula>   = { <comment> } "p cnf " <var-max> " " <num-cls> "\n" <cnf>
     <cnf>       = { <comment> | <clause> }
     <comment>   = "c " <anything> "\n"
-    <clause>    = { <blank> }{ \<lit> } "0"
+    <clause>    = { <blank> }{ <lit> } "0"
     <lit>       = <pos> <blank> | <neg> <blank>
     <pos>       = "1" | "2" | .... | <max-idx>
     <neg>       = "-" <pos>
@@ -46,12 +46,12 @@ where '|' means choice, '{ ... }' is equivalent to the Kleene star
 operation (that is a finite number of repetitions including 0) and
 \<max-idx> is 2^31 - 1.
 
-In the first line of a DIMCAS formula, <var-max> should be at least
-as high as the largest <pos> used in the formula, while <num-cls>
+In the first line of a DIMCAS formula, \<var-max> should be at least
+as high as the largest \<pos> used in the formula, while \<num-cls>
 should equal the number of clauses in the formula. In case there
-exists a literal <pos> or "-"<pos>, such that <pos> is larger than
-<var-max>, then the formula is invalid. The formula is also invalid
-if the number of clauses is not equal to <num-cls>. 
+exists a literal \<pos> or "-" \<pos>, such that \<pos> is larger than
+\<var-max>, then the formula is invalid. The formula is also invalid
+if the number of clauses is not equal to \<num-cls>. 
 
 The DIMCAS format is the default format used in SAT solvers and
 has been used as the input format by all SAT Competitions.
@@ -67,7 +67,7 @@ The syntax of a clausal proof in DRAT format is as follows:
     <blank>       = " " | "\n" | "\t"
 
 Notice that the syntax of the DIMACS and DRAT formats is equivalent
-for <clause>, <lit>, <pos>, and <neg>.
+for \<clause>, \<lit>, \<pos>, and \<neg>.
 
 However, DIMACS and DRAT files differ in their interpretation.
 Formulas in the DIMACS files are multi-sets of clauses. Hence,
