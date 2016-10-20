@@ -42,16 +42,16 @@ The syntax of a CNF formula in DIMACS format is:
     <neg>       = "-" <pos>
     <blank>     = " " | "\n" | "\t"
 
-where '|' means choice, '{ ... }' is equivalent to the Kleene star
+where `|` means choice, `{ ... }` is equivalent to the Kleene star
 operation (that is a finite number of repetitions including 0) and
-\<max-idx> is 2^31 - 1.
+`<max-idx>` is 2^31 - 1.
 
-In the first line of a DIMCAS formula, \<var-max> should be at least
-as high as the largest \<pos> used in the formula, while \<num-cls>
+In the first line of a DIMCAS formula, `<var-max>` should be at least
+as high as the largest `<pos>` used in the formula, while \<num-cls>
 should equal the number of clauses in the formula. In case there
-exists a literal \<pos> or "-" \<pos>, such that \<pos> is larger than
-\<var-max>, then the formula is invalid. The formula is also invalid
-if the number of clauses is not equal to \<num-cls>. 
+exists a literal `<pos>` or `"-" <pos>`, such that `<pos>` is larger than
+`<var-max>`, then the formula is invalid. The formula is also invalid
+if the number of clauses is not equal to `<num-cls>`. 
 
 The DIMCAS format is the default format used in SAT solvers and
 has been used as the input format by all SAT Competitions.
