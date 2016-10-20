@@ -84,7 +84,7 @@ A clausal proof is valid with respect to a given formula, if
 The empty clause typically is the last clause of the proof file,
 because all lines after the empty clause are redundant and ignored.
 
-*** Clause Syntax Restrictions ***
+## Clause Syntax Restrictions
 
 There are two restrictions regarding clauses in both the DIMACS
 and the DRAT formats. The first restriction is that no clause can
@@ -94,7 +94,7 @@ The second restriction is that clauses cannot contain duplicate
 literals. On the other hand, formulas are allowed to have
 duplicate clauses. Hence formulas are multi-sets of clauses.
 
-*** Clause Addition Preconditions ***
+## Clause Addition Preconditions
 
 A clause with only one literal is called a unit clause. Checking
 whether a clause is redundant with respect to a CNF formula is
@@ -131,7 +131,7 @@ validation fails, then the proof is invalid.
 The empty clause at the end of the proof should have the AT property
 as it does not have a first literal.
 
-*** Clause Deletion Details ***
+## Clause Deletion Details
 
 The only expectation of a clause deletion step is that the to-be-deleted
 clause is present in the current formula. Clause deletion steps are ignored
@@ -153,7 +153,7 @@ of unit clauses can turn a valid DRAT proof into an invalid one --- and the
 other way around. DRAT-trim therefore prints a warning statement to inform
 the user about such a modification.
 
-*** Example ***
+## Example
 
 Consider the following CNF formula in DIMACS format (with spacing to
 increase readability):
@@ -192,19 +192,18 @@ The second step is the removal of the clause “d -1 2 4 0”. Deletion steps
 are not checked. This results in F_{2} = F_{1} - (-1 2 4).
 
 
-*** Remarks on Efficient Proof Validation ***
+## Remarks on Efficient Proof Validation 
 
 In order to efficiently validate a DRAT proof, several optimizations to the
 checking algorithm are required. Examples of such optimizations are backward
 checking and core first unit propagation. Details about these techniques are
 described in [2].
 
-*** Binary DRAT Format ***
+## Binary DRAT Format
 
-NOTE: Here we describe a "binary format" for input files (formula
-files and proof files).
+NOTE: Here we describe a "binary format" for input proof files.
 
-* Mapping DIMACS Literals to Unsigned Integers *
+##### Mapping DIMACS Literals to Unsigned Integers
 
 The first step of the binary encoding is mapping literals in the DIMACS format
 to unsigned integers. The following mapping function is used:
@@ -218,7 +217,7 @@ below.
                -8191   16383
                -8193   16387
 
-* Variable-Byte Encoding of Unsigned Integers *
+##### Variable-Byte Encoding of Unsigned Integers
 
 Assume that 'w0, ..., wi' are 7-bit words, 'w1' to 'wi' all non zero and the
 unsigned number 'x' can be represented as
@@ -247,7 +246,7 @@ the sequence, or whether there are still more bytes to follow. Here are some exa
     2^28 - 1           ff ff ff 7f
     2^28 + 7           87 80 80 80 01
 
-* Bringing it together *
+###### Bringing it together
 
 In the binary DRAT format, each clause consists of at least two bytes. The first
 byte expresses whether the lemma is added (character 'a' or 61 in hexadecimal) or
@@ -271,9 +270,9 @@ Marijn Heule, The University of Texas at Austin, 2016.
 
 References:
 
-[1] Nathan Wetzler, Marijn J.H. Heule and Warren A. Hunt (2014).
+- [1] Nathan Wetzler, Marijn J.H. Heule and Warren A. Hunt (2014).
     DRAT-trim: Efficient Checking and Trimming Using Expressive Clausal Proofs.
     In Theory and Applications of Satisfiability Testing - SAT 2014.
     Lecture Notes in Computer Science 8561, pp. 422-429, Springer.
-[2] Marijn Heule, Warren A. Hunt Jr., and Nathan Wetzler (2013)
+- [2] Marijn Heule, Warren A. Hunt Jr., and Nathan Wetzler (2013)
     Trimming while checking clausal proofs. FMCAD 2013: 181-188.
