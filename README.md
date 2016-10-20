@@ -33,14 +33,14 @@ are defined below.
 
 The syntax of a CNF formula in DIMACS format is:
 
-    <formula>     = { <comment> } "p cnf " <var-max> " " <num-cls> "\n" { <block> }
-    <block>       = <comment> | <clause>
-    <comment>     = "c " <anything> "\n"
-    <clause>      = { <blank> }{ \<lit> } "0"
-    <lit>         = <pos> <blank> | <neg> <blank>
-    <pos>         = "1" | "2" | .... | <max-idx>
-    <neg>         = "-" <pos>
-    <blank>       = " " | "\n" | "\t"
+    <formula>   = { <comment> } "p cnf " <var-max> " " <num-cls> "\n" <cnf>
+    <cnf>       = { <comment> | <clause> }
+    <comment>   = "c " <anything> "\n"
+    <clause>    = { <blank> }{ \<lit> } "0"
+    <lit>       = <pos> <blank> | <neg> <blank>
+    <pos>       = "1" | "2" | .... | <max-idx>
+    <neg>       = "-" <pos>
+    <blank>     = " " | "\n" | "\t"
 
 where '|' means choice, '{ ... }' is equivalent to the Kleene star
 operation (that is a finite number of repetitions including 0) and
@@ -58,14 +58,14 @@ has been used as the input format by all SAT Competitions.
 
 The syntax of a clausal proof in DRAT format is as follows:
 
-   <proof>       = { <step> }
-   <step>        = <comment> | <clause> | "d" <clause>
-   <comment>     = "c " <anything> "\n"
-   <clause>      = { <blank> }{ <lit> } "0"
-   <lit>         = <pos> <blank> | <neg> <blank>
-   <pos>         = "1" | "2" | .... | <max-idx>
-   <neg>         = "-" <pos>
-   <blank>       = " " | "\n" | "\t"
+     <proof>       = { <step> }
+     <step>        = <comment> | <clause> | "d" <clause>
+     <comment>     = "c " <anything> "\n"
+     <clause>      = { <blank> }{ <lit> } "0"
+     <lit>         = <pos> <blank> | <neg> <blank>
+     <pos>         = "1" | "2" | .... | <max-idx>
+     <neg>         = "-" <pos>
+     <blank>       = " " | "\n" | "\t"
 
 Notice that the syntax of the DIMACS and DRAT formats is equivalent
 for <clause>, <lit>, <pos>, and <neg>.
@@ -190,7 +190,6 @@ F_{1} = F_{0} + (-1).
 
 The second step is the removal of the clause “d -1 2 4 0”. Deletion steps
 are not checked. This results in F_{2} = F_{1} - (-1 2 4).
-
 
 ## Remarks on Efficient Proof Validation 
 
