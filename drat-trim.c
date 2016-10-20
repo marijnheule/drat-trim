@@ -44,9 +44,6 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define SUCCEED          40
 #define FAILED           50
 
-#define CANDIDATE_INIT_SIZE    10
-#define DEPENDENCIES_INIT_SIZE 10
-
 struct solver { FILE *inputFile, *proofFile, *coreFile, *lemmaFile, *traceFile;
     int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, MARKcount,
@@ -725,11 +722,11 @@ int parse (struct solver* S) {
   S->MARKcount = 0;
   S->COREcount = 0;
 
-  S->maxCandidates = CANDIDATE_INIT_SIZE;
+  S->maxCandidates = INIT;
   S->resolutionCandidates = (int*) malloc (sizeof(int) * S->maxCandidates);
   for (i = 0; i < S->maxCandidates; i++) S->resolutionCandidates[i] = 0;
 
-  S->maxDependencies = DEPENDENCIES_INIT_SIZE;
+  S->maxDependencies = INIT;
   S->dependencies = (int*) malloc (sizeof(int) * S->maxDependencies);
   for (i = 0; i < S->maxDependencies; i++) S->dependencies[i] = 0;
 
