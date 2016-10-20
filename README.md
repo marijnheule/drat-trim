@@ -58,14 +58,13 @@ has been used as the input format by all SAT Competitions.
 
 The syntax of a clausal proof in DRAT format is as follows:
 
-     <proof>       = { <step> }
-     <step>        = <comment> | <clause> | "d" <clause>
-     <comment>     = "c " <anything> "\n"
-     <clause>      = { <blank> }{ <lit> } "0"
-     <lit>         = <pos> <blank> | <neg> <blank>
-     <pos>         = "1" | "2" | .... | <max-idx>
-     <neg>         = "-" <pos>
-     <blank>       = " " | "\n" | "\t"
+    <proof>       = { <comment> | <clause> | "d" <blank> <clause> }
+    <comment>     = "c " <anything> "\n"
+    <clause>      = { <blank> }{ <lit> } "0"
+    <lit>         = <pos> <blank> | <neg> <blank>
+    <pos>         = "1" | "2" | .... | <max-idx>
+    <neg>         = "-" <pos>
+    <blank>       = " " | "\n" | "\t"
 
 Notice that the syntax of the DIMACS and DRAT formats is equivalent
 for <clause>, <lit>, <pos>, and <neg>.
