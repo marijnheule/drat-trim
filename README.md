@@ -1,4 +1,4 @@
-************ The DRAT format and DRAT-trim checker **************
+# The DRAT format and DRAT-trim checker
 
 The proof checker DRAT-trim can be used to check whether a
 propositional formula in the DIMACS format is unsatisfiable. Given
@@ -25,7 +25,7 @@ Clause deletion steps are not checked, because they trivially
 preserve satisfiability. The main reason to include clause deletion
 steps in proofs is to reduce the computational costs to validate proofs.
 
-*** Syntax of Input Files ***
+## Syntax of Input Files
 
 The DRAT-trim checker requires two input files: a CNF formula in the
 DIMACS format and a clausal proof in the DRAT format. Both formats
