@@ -78,7 +78,7 @@ influences the proof.
 
 A clausal proof is valid with respect to a given formula, if
 1) all clause addition steps are valid (details are below); and
-2) if the proof contains the empty clause ("0").
+2) if the proof contains the empty clause (`0`).
 
 The empty clause typically is the last clause of the proof file,
 because all lines after the empty clause are redundant and ignored.
@@ -177,17 +177,17 @@ A valid DRAT proof for the above formula is:
 The first step is to validate that the first clause in the proof `“-1 0”`
 has the RAT property with respect to F_{0} (the input formula). This RAT
 check can be partitioned into three AT checks: there are three clauses
-containing the literal “1”: `“1 2 -3 0”`, `“1 3 4 0”` and `“1 -2 -4 0”`.
+containing the literal `1`: `1 2 -3 0`, `1 3 4 0` and `1 -2 -4 0`.
 Following the description above, the RAT checks requires checking the AT
-check for the clauses “-1 2 -3 0”, “-1 3 4 0” and “-1 -2 -4 0”. For the
+check for the clauses (-1 2 -3), (-1 3 4) and (-1 -2 -4). For the
 first AT check, UCP on the formula F_{0} + (1) + (-2) + (3) should result
-the empty clause. First, clause “-1 -3 -4 0” is reduced to the unit (-4).
-Now the clause “-1 2 4 0” is reduced to the empty clause.
+the empty clause. First, clause `-1 -3 -4 0` is reduced to the unit (-4).
+Now the clause `-1 2 4 0` is reduced to the empty clause.
 
 The RAT check of “-1 0” succeeds. Now “-1 0” will be added to the formula:
 F_{1} = F_{0} + (-1).
 
-The second step is the removal of the clause “d -1 2 4 0”. Deletion steps
+The second step is the removal of the clause `d -1 2 4 0`. Deletion steps
 are not checked. This results in F_{2} = F_{1} - (-1 2 4).
 
 ## Remarks on Efficient Proof Validation 
@@ -217,8 +217,8 @@ below.
 
 ### Variable-Byte Encoding of Unsigned Integers
 
-Assume that 'w0, ..., wi' are 7-bit words, 'w1' to 'wi' all non zero and the
-unsigned number 'x' can be represented as
+Assume that `w0, ..., wi` are 7-bit words, `w1` to `wi` all non zero and the
+unsigned number `x` can be represented as
 
     x = w0 + 2^7*w1 + 2^14*w2 + 2^(7*i)*wi
 
@@ -247,9 +247,9 @@ the sequence, or whether there are still more bytes to follow. Here are some exa
 ### Bringing it together
 
 In the binary DRAT format, each clause consists of at least two bytes. The first
-byte expresses whether the lemma is added (character 'a' or 61 in hexadecimal) or
-deleted (character 'd' or 64 in hexadecimal). The last byte of each lemma is the
-zero byte (00 in hexadecimal). In between these two bytes, the literals of the
+byte expresses whether the lemma is added (character `a` or `61` in hexadecimal) or
+deleted (character `d` or `64` in hexadecimal). The last byte of each lemma is the
+zero byte (`00` in hexadecimal). In between these two bytes, the literals of the
 lemma are shown as unsigned integers in the variable-byte encoding.
 
 In the example below, the plain DRAT format requires 26 bytes (including the new
