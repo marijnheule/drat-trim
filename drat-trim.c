@@ -602,7 +602,7 @@ int parse (struct solver* S) {
     fileSwitchFlag = nZeros <= 0;
 
     if (size == 0) {
-      if (fileSwitchFlag) {
+      if (fileSwitchFlag) { // read for proof
         if (S->binMode) {
           int res = getc_unlocked (S->proofFile);
           if      (res == EOF) break;
@@ -621,7 +621,10 @@ int parse (struct solver* S) {
           tmp = read_lit (S->proofFile, &lit); }
         else {
           tmp = fscanf (S->proofFile, " %i ", &lit); } }
-      if (tmp == EOF && !fileSwitchFlag) fileSwitchFlag = 1; }
+      if (tmp == EOF && !fileSwitchFlag) {
+        printf("c WARNING: early EOF of the input formula\n");
+        printf("c WARNING: %i clauses less than expected\n", nZeros);
+        fileSwitchFlag = 1; } }
 
     if (tmp == 0) {
       char ignore[1024];
