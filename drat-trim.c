@@ -236,7 +236,7 @@ void printProof (struct solver *S) {
     while (*S->delinfo) {
       long offset = *S->delinfo--;
       int *lemmas = S->DB + (offset >> 1);
-      if (!lemmas[1]) continue; // don't delete unit clauses
+      if (!lemmas[1] && (offset & 1)) continue; // don't delete unit clauses
       if (offset & 1) fprintf (S->lemmaFile, "d ");
       int reslit = lemmas[PIVOT];
       while (*lemmas) {
@@ -568,6 +568,8 @@ int parse (struct solver* S) {
     if (tmp > 0 && tmp != EOF) break; tmp = fscanf (S->inputFile, "%*s\n"); }  // In case a commment line was found
   while (tmp != 2 && tmp != EOF);                                              // Skip it and read next line
   int nZeros = S->nClauses;
+
+  printf("c parsing input formula with %i variables and %li clauses\n", S->nVars, S->nClauses);
 
   bsize = S->nVars*2;
   if ((buffer = (int*) malloc(bsize * sizeof(int))) == NULL) return ERROR;
