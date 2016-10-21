@@ -234,8 +234,9 @@ void printProof (struct solver *S) {
     S->delinfo--;
     while (*S->delinfo) {
       long offset = *S->delinfo--;
-      if (offset & 1) fprintf (S->lemmaFile, "d ");
       int *lemmas = S->DB + (offset >> 1);
+      if (!lemmas[1]) continue; // don't delete unit clauses
+      if (offset & 1) fprintf (S->lemmaFile, "d ");
       int reslit = lemmas[PIVOT];
       while (*lemmas) {
         int lit = *lemmas++;
