@@ -821,7 +821,7 @@ int main (int argc, char** argv) {
   S.mode      = BACKWARD_UNSAT;
   S.delete    = 1;
   S.binMode   = 0;
-  gettimeofday(&S.start_time, NULL);
+  gettimeofday (&S.start_time, NULL);
 
   int i, tmp = 0;
   for (i = 1; i < argc; i++) {
@@ -872,6 +872,11 @@ int main (int argc, char** argv) {
   else if  (parseReturnValue == UNSAT)    printf ("c trivial UNSAT\ns VERIFIED\n");
   else if  ((sts = verify (&S)) == UNSAT) printf ("s VERIFIED\n");
   else printf ("s NOT VERIFIED\n")  ;
+  struct timeval current_time;
+  gettimeofday(&current_time, NULL);
+  long runtime = (current_time.tv_sec  - S.start_time.tv_sec) * 1000000 + 
+                 (current_time.tv_usec - S.start_time.tv_usec);
+  printf("c verification time: %.3f seconds\n", (double) (runtime / 1000000.0)); 
   freeMemory (&S);
   return (sts != UNSAT); // 0 on success, 1 on any failure
 }
