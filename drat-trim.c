@@ -1,6 +1,7 @@
 /************************************************************************************[drat-trim.c]
-Copyright (c) 2014-2016, Marijn Heule and Nathan Wetzler
-Last edit, October 18, 2016
+Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
+Copyright (c) 2015-2016 Marijn Heule, The University of Texas at Austin.
+Last edit, October 21, 2016
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -707,7 +708,6 @@ int parse (struct solver* S) {
   free (buffer);
 
   printf ("c finished parsing\n");
-//  printf ("c finished parsing. average lifetime of lemmas is %.3f\n", 0);
 
   int n = S->maxVar;
   S->falseStack = (int*) malloc((n + 1) * sizeof(int)); // Stack of falsified literals -- this pointer is never changed
