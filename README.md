@@ -25,6 +25,34 @@ Clause deletion steps are not checked, because they trivially
 preserve satisfiability. The main reason to include clause deletion
 steps in proofs is to reduce the computational costs to validate proofs.
 
+## Getting started
+
+The DRAT-trim proof checker can be compiled using: `make` .
+
+usage: `./drat-trim [INPUT] [<PROOF>] [<option> ...]`
+
+where `<option>` is one of the following:
+
+    -h          print this command line option summary
+    -c CORE     prints the unsatisfiable core to the file CORE
+    -l LEMMAS   prints the core lemmas to the file LEMMAS
+    -r TRACE    resolution graph in TRACECHECK format 
+
+    -t <lim>    time limit in seconds (default 20000)
+    -u          default unit propatation (i.e., no core-first)
+    -f          forward mode for UNSAT
+    -v          more verbose output
+    -p          run in plain mode (i.e., ignore deletion information)
+
+    -S          run in SAT check mode (forward checking)
+
+and input and proof are specified as follows:
+
+    INPUT       input file in DIMACS format
+    PROOF       proof file in DRAT format (stdin if no argument) 
+
+The syntax of the input and proof files is described below.
+
 ## Syntax of Input Files
 
 The DRAT-trim checker requires two input files: a CNF formula in the
