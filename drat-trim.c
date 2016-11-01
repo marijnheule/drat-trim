@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
 Copyright (c) 2015-2016 Marijn Heule, The University of Texas at Austin.
-Last edit, October 21, 2016
+Last edit, November 1, 2016
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -675,6 +675,9 @@ int parse (struct solver* S) {
       if (S->mode == FORWARD_SAT) if (nZeros > 0) clause[ID] |= ACTIVE;
 
       qsort (buffer, size, sizeof (int), compare);
+      for (i = 0; i < size - 1; ++i)
+        if (buffer[i] == buffer[i+1]) {
+          printf("c WARNING: clause detected with duplicate literals: "); printClause (buffer); }
       for (i = 0; i < size; ++i) { clause[ i ] = buffer[ i ]; } clause[ i ] = 0;
       S->mem_used += size + EXTRA;
 
@@ -880,9 +883,9 @@ int main (int argc, char** argv) {
   else printf ("s NOT VERIFIED\n")  ;
   struct timeval current_time;
   gettimeofday (&current_time, NULL);
-  long runtime = (current_time.tv_sec  - S.start_time.tv_sec) * 1000000 + 
+  long runtime = (current_time.tv_sec  - S.start_time.tv_sec) * 1000000 +
                  (current_time.tv_usec - S.start_time.tv_usec);
-  printf ("c verification time: %.3f seconds\n", (double) (runtime / 1000000.0)); 
+  printf ("c verification time: %.3f seconds\n", (double) (runtime / 1000000.0));
   freeMemory (&S);
   return (sts != UNSAT); // 0 on success, 1 on any failure
 }
