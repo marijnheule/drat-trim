@@ -530,7 +530,6 @@ int compare (const void *a, const void *b) {
 
 long matchClause (struct solver* S, long *clauselist, int listsize, int* input, int size) {
   int i, j;
-  qsort (input, size, sizeof (int), compare);
   for (i = 0; i < listsize; ++i) {
     int *clause = S->DB + clauselist[i];
     for (j = 0; j <= size; j++)
@@ -645,6 +644,14 @@ int parse (struct solver* S) {
       printf ("c illegal literal %i due to max var %i\n", lit, S->nVars); exit (0); }
     if (!lit) {
       buffer[size] = 0;
+      qsort (buffer, size, sizeof (int), compare);
+      int j = 0;
+      for (i = 0; i < size; ++i) {
+        if (buffer[i] == buffer[i+1]) {
+          printf ("c WARNING: detected and deleted duplicate literal: "); printClause (buffer); }
+        else { buffer[j++] = buffer[i]; } }
+      buffer[j] = 0; size = j;
+
       if (size == 0 && !fileSwitchFlag) retvalue = UNSAT;
       if (del && S->mode == BACKWARD_UNSAT && size <= 1)  {
         printf ("c WARNING: backward mode ignores deletion of (pseudo) unit clause ");
@@ -674,10 +681,6 @@ int parse (struct solver* S) {
       clause[ID] = 2 * S->count; S->count++;
       if (S->mode == FORWARD_SAT) if (nZeros > 0) clause[ID] |= ACTIVE;
 
-      qsort (buffer, size, sizeof (int), compare);
-      for (i = 0; i < size - 1; ++i)
-        if (buffer[i] == buffer[i+1]) {
-          printf("c WARNING: clause detected with duplicate literals: "); printClause (buffer); }
       for (i = 0; i < size; ++i) { clause[ i ] = buffer[ i ]; } clause[ i ] = 0;
       S->mem_used += size + EXTRA;
 
