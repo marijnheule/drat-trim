@@ -44,12 +44,14 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define BACKWARD_UNSAT   30
 #define SUCCEED          40
 #define FAILED           50
+#define NOWARNING	 60
+#define HARDWARNING	 70
 
 struct solver { FILE *inputFile, *proofFile, *coreFile, *lemmaFile, *traceFile;
     int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, MARKcount,
       Lcount, maxCandidates, *resolutionCandidates, maxDependencies, nDependencies,
-      *dependencies, maxVar, mode, verb, unitSize, prep, *current, delLit;
+      *dependencies, maxVar, mode, verb, unitSize, prep, *current, delLit, warning;
     struct timeval start_time;
     long mem_used, time, nClauses, lastLemma, *unitStack, *reason, lemmas, arcs, *adlist, **wlist, *delinfo;  };
 
@@ -305,7 +307,9 @@ int redundancyCheck (struct solver *S, int *clause, int size, int uni) {
   S->nDependencies = 0;
   for (i = 0; i < size; ++i) {
     if (S->false[-clause[i]]) { // should only occur in forward mode
-      printf ("c WARNING: found a tautological clause in proof: "); printClause (clause);
+      if (S->warning != NOWARNING) {
+        printf ("c WARNING: found a tautological clause in proof: "); printClause (clause); }
+      if (S->warning == HARDWARNING) exit (HARDWARNING);
       while (S->forced < S->assigned) S->false[*(--S->assigned)] = 0;
       return SUCCEED; }
     ASSUME(-clause[i]); }
@@ -624,8 +628,10 @@ int parse (struct solver* S) {
         else {
           tmp = fscanf (S->proofFile, " %i ", &lit); } }
       if (tmp == EOF && !fileSwitchFlag) {
-        printf ("c WARNING: early EOF of the input formula\n");
-        printf ("c WARNING: %i clauses less than expected\n", nZeros);
+        if (S->warning != NOWARNING) {
+          printf ("c WARNING: early EOF of the input formula\n");
+          printf ("c WARNING: %i clauses less than expected\n", nZeros); }
+        if (S->warning == HARDWARNING) exit (HARDWARNING);
         fileSwitchFlag = 1; } }
 
     if (tmp == 0) {
@@ -648,14 +654,18 @@ int parse (struct solver* S) {
       int j = 0;
       for (i = 0; i < size; ++i) {
         if (buffer[i] == buffer[i+1]) {
-          printf ("c WARNING: detected and deleted duplicate literal: "); printClause (buffer); }
+          if (S->warning != NOWARNING) {
+            printf ("c WARNING: detected and deleted duplicate literal: "); printClause (buffer); }
+          if (S->warning == HARDWARNING) exit (HARDWARNING); }
         else { buffer[j++] = buffer[i]; } }
       buffer[j] = 0; size = j;
 
       if (size == 0 && !fileSwitchFlag) retvalue = UNSAT;
       if (del && S->mode == BACKWARD_UNSAT && size <= 1)  {
-        printf ("c WARNING: backward mode ignores deletion of (pseudo) unit clause ");
-        printClause (buffer);
+        if (S->warning != NOWARNING) {
+          printf ("c WARNING: backward mode ignores deletion of (pseudo) unit clause ");
+          printClause (buffer); }
+        if (S->warning == HARDWARNING) exit (HARDWARNING);
         del = 0; uni = 0; size = 0; continue; }
       int rem = buffer[0];
       buffer[ size ] = 0;
@@ -665,13 +675,17 @@ int parse (struct solver* S) {
           long match = 0;
             match = matchClause (S, hashTable[hash], hashUsed[hash], buffer, size);
             if (match == 0) {
-              printf ("c MATCHING ERROR: "); printClause (buffer); exit (0); }
+              if (S->warning != NOWARNING) {
+                printf ("c WARNING: deleted clause does not occur: "); printClause (buffer); }
+              if (S->warning == HARDWARNING) exit (HARDWARNING);
+              goto end_delete; }
             if (S->mode == FORWARD_SAT) S->DB[ match - 2 ] = rem;
             hashUsed[hash]--;
             active--;
             if (S->lastLemma == admax) { admax = (admax * 3) >> 1;
               S->adlist = (long*) realloc (S->adlist, sizeof (long) * admax); }
             S->adlist[ S->lastLemma++ ] = (match << INFOBITS) + 1; }
+        end_delete:;
         if (del) { del = 0; uni = 0; size = 0; continue; } }
 
       if (S->mem_used + size + EXTRA > DBsize) { DBsize = (DBsize * 3) >> 1;
@@ -700,7 +714,9 @@ int parse (struct solver* S) {
    else buffer[ size++ ] = lit; }                            // Add literal to buffer
 
   if (S->mode == FORWARD_SAT && active) {
-    printf ("c WARNING: %i clauses active if proof succeeds\n", active);
+    if (S->warning != NOWARNING)
+      printf ("c WARNING: %i clauses active if proof succeeds\n", active);
+    if (S->warning == HARDWARNING) exit (HARDWARNING);
     for (i = 0; i < BIGINIT; i++) {
       int j;
       for (j = 0; j < hashUsed[i]; j++) {
@@ -811,6 +827,8 @@ void printHelp ( ) {
   printf ("  -u          default unit propatation (i.e., no core-first)\n");
   printf ("  -f          forward mode for UNSAT\n");
   printf ("  -v          more verbose output\n");
+  printf ("  -w          suppress warning messages\n");
+  printf ("  -W          exit after first warning\n");
   printf ("  -p          run in plain mode (i.e., ignore deletion information)\n\n");
   printf ("  -S          run in SAT check mode (forward checking)\n\n");
   printf ("and input and proof are specified as follows\n\n");
@@ -829,6 +847,7 @@ int main (int argc, char** argv) {
   S.timeout   = TIMEOUT;
   S.mask      = 0;
   S.verb      = 0;
+  S.warning   = 0;
   S.prep      = 0;
   S.mode      = BACKWARD_UNSAT;
   S.delete    = 1;
@@ -845,6 +864,8 @@ int main (int argc, char** argv) {
       else if (argv[i][1] == 't') S.timeout   = atoi (argv[++i]);
       else if (argv[i][1] == 'u') S.mask      = 1;
       else if (argv[i][1] == 'v') S.verb      = 1;
+      else if (argv[i][1] == 'w') S.warning   = NOWARNING;
+      else if (argv[i][1] == 'W') S.warning   = HARDWARNING;
       else if (argv[i][1] == 'p') S.delete    = 0;
       else if (argv[i][1] == 'f') S.mode      = FORWARD_UNSAT;
       else if (argv[i][1] == 'S') S.mode      = FORWARD_SAT; }
