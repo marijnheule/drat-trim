@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
 Copyright (c) 2015-2016 Marijn Heule, The University of Texas at Austin.
-Last edit, November 1, 2016
+Last edit, November 2, 2016
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -271,7 +271,7 @@ void postprocess (struct solver *S) {
   printProof (S);
   printTrace (S); }
 
-void printDependencies (struct solver *S, int* clause) {
+void printDependencies (struct solver *S, int* clause, int RATflag) {
   if (S->traceFile) {  // This is quadratic, can be n log n
     int i, j;
 
@@ -282,12 +282,14 @@ void printDependencies (struct solver *S, int* clause) {
       fprintf (S->traceFile, "%u ", S->count - 1); }
     fprintf (S->traceFile, "0 ");
 
-    for (i = 0; i < S->nDependencies; i++) {
+    // print dependencies in order of becoming unit
+    for (i = S->nDependencies - 1; i >= 0; i--) {
       if (S->dependencies[i] != 0) {
         fprintf (S->traceFile, "%d ", S->dependencies[i]);
-        for (j = i + 1; j < S->nDependencies; j++)
-          if (S->dependencies[j] == S->dependencies[i])
-            S->dependencies[j] = 0; } }
+        if (RATflag) { // only duplicate dependencies due to RAT
+          for (j = i - 1; j >= 0; j--)
+            if (S->dependencies[j] == S->dependencies[i])
+              S->dependencies[j] = 0; } } }
     fprintf (S->traceFile, "0\n"); } }
 
 int redundancyCheck (struct solver *S, int *clause, int size, int uni) {
@@ -322,7 +324,7 @@ int redundancyCheck (struct solver *S, int *clause, int size, int uni) {
     if (indegree  > 2 && S->prep == 1) {
       S->prep = 0; if (S->verb) printf ("c [%li] preprocessing checking mode off\n", S->time); }
     if (S->verb) printf ("c lemma has RUP\n");
-    printDependencies (S, clause);
+    printDependencies (S, clause, 0);
     return SUCCEED; }
 
   // Failed RUP check.  Now test RAT.
@@ -389,7 +391,7 @@ int redundancyCheck (struct solver *S, int *clause, int size, int uni) {
   S->RATcount++;
   if (S->verb) printf ("c lemma has RAT on %i\n", reslit);
 
-  printDependencies (S, clause);
+  printDependencies (S, clause, 1);
   return SUCCEED; }
 
 int verify (struct solver *S) {
@@ -403,7 +405,7 @@ int verify (struct solver *S) {
   S->time = S->count; // Alternative time init
   if (propagateUnits (S, 1) == UNSAT) {
     printf ("c UNSAT via unit propagation on the input instance\n");
-    printDependencies (S, NULL);
+    printDependencies (S, NULL, 0);
     postprocess (S); return UNSAT; }
 
   if (S->mode == FORWARD_UNSAT) printf ("c start forward verification\n");
@@ -477,10 +479,10 @@ int verify (struct solver *S) {
 
   start_verification:;
   if (S->mode == FORWARD_UNSAT) {
-    printDependencies (S, NULL);
+    printDependencies (S, NULL, 0);
     postprocess (S); return UNSAT; }
 
-  printDependencies (S, NULL);
+  printDependencies (S, NULL, 0);
 
   if (S->mode == FORWARD_SAT) {
     printf ("c ERROR: found empty clause during SAT check\n"); exit (0); }
