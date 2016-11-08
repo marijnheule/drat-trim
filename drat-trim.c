@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
 Copyright (c) 2015-2016 Marijn Heule, The University of Texas at Austin.
-Last edit, November 2, 2016
+Last edit, November 8, 2016
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -48,7 +48,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define HARDWARNING	 70
 
 struct solver { FILE *inputFile, *proofFile, *coreFile, *lemmaFile, *traceFile;
-    int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode,
+    int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode, traceMode,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, MARKcount,
       Lcount, maxCandidates, *resolutionCandidates, maxDependencies, nDependencies,
       *dependencies, maxVar, mode, verb, unitSize, prep, *current, delLit, warning;
@@ -116,7 +116,7 @@ static inline void markClause (struct solver* S, int* clause, int index) {
   if ((clause[index - 1] & ACTIVE) == 0) {
     S->MARKcount++;
     clause[index - 1] |= ACTIVE;
-    if (S->lemmaFile && clause[1])
+    if ((S->lemmaFile || S->traceFile) && clause[1])
       *(S->delinfo++) = (((long) (clause - S->DB) + index) << 1) + 1;
     if (clause[1 + index] == 0) return;
     markWatch (S, clause,     index, -index);
@@ -233,10 +233,11 @@ void printProof (struct solver *S) {
     printf ("c optimized proofs are not supported for forward checking\n");
     return; }
 
+  long *delinfo = S->delinfo;
   if (S->lemmaFile) {
-    S->delinfo--;
-    while (*S->delinfo) {
-      long offset = *S->delinfo--;
+    delinfo--;
+    while (*delinfo) {
+      long offset = *delinfo--;
       int *lemmas = S->DB + (offset >> 1);
       if (!lemmas[1] && (offset & 1)) continue; // don't delete unit clauses
       if (offset & 1) fprintf (S->lemmaFile, "d ");
@@ -252,7 +253,35 @@ void printProof (struct solver *S) {
           fprintf (S->lemmaFile, "%i ", lit); }
       fprintf (S->lemmaFile, "0\n"); }
     fprintf (S->lemmaFile, "0\n");
-    fclose (S->lemmaFile); } }
+    fclose (S->lemmaFile); }
+
+  delinfo = S->delinfo;
+  if (S->traceFile && !S->traceMode) {
+    int index = S->nClauses;
+    delinfo--;
+    while (*delinfo) {
+      long offset = *delinfo--;
+      int *lemmas = S->DB + (offset >> 1);
+      if ((offset & 1) == 0) {
+        if (index == 0) fprintf (S->traceFile, "0\n");
+        index = lemmas[ID] >> 1;
+        continue; }
+      if (!lemmas[1] && (offset & 1)) continue; // don't delete unit clauses
+      if (offset & 1) {
+        if (index != 0)
+          fprintf (S->traceFile, "%i d ", index);
+        fprintf (S->traceFile, "%i ", lemmas[ID] >> 1);
+        index = 0; } } } }
+
+void printNoCore (struct solver *S) {
+  if (S->traceFile) { int i;
+    fprintf (S->traceFile, "%ld d ", S->nClauses);
+    for (i = 0; i < S->nClauses; i++) {
+      int *lemmas = S->DB + (S->adlist[i] >> INFOBITS);
+      if (lemmas[ID] & ACTIVE == 0)
+        fprintf (S->traceFile, "%i ", lemmas[ID] >> 1); }
+    fprintf (S->traceFile, "0\n");
+    fclose (S->traceFile); } }
 
 // print the dependency graph to traceFile in TraceCheck+ format
 // this procedure adds the active clauses at the end of the trace
@@ -269,7 +298,8 @@ void printTrace (struct solver *S) {
 void postprocess (struct solver *S) {
   printCore  (S);
   printProof (S);
-  printTrace (S); }
+  if (S->traceMode == 0) printNoCore (S);
+  else                   printTrace (S); }
 
 void printDependencies (struct solver *S, int* clause, int RATflag) {
   if (S->traceFile) {  // This is quadratic, can be n log n
@@ -396,7 +426,7 @@ int redundancyCheck (struct solver *S, int *clause, int size, int uni) {
 
 int verify (struct solver *S) {
   long *delstack = NULL;
-  if (S->lemmaFile) {
+  if (S->lemmaFile || S->traceFile) {
     delstack = (long *) malloc (sizeof (long) * S->count * 2);
     S->delinfo = delstack;
     *S->delinfo++ = 0; }
@@ -525,7 +555,7 @@ int verify (struct solver *S) {
     if (seconds > S->timeout) printf ("s TIMEOUT\n"), exit (0);
 
     if (redundancyCheck (S, clause, size, uni) == FAILED) return SAT;
-    if (S->lemmaFile) *(S->delinfo++) = (ad >> INFOBITS) << 1; }
+    if (S->lemmaFile || S->traceFile) *(S->delinfo++) = (ad >> INFOBITS) << 1; }
 
   postprocess (S);
   if (delstack) free (delstack);
@@ -651,6 +681,7 @@ int parse (struct solver* S) {
     if (abs (lit) > S->nVars && !fileSwitchFlag) {
       printf ("c illegal literal %i due to max var %i\n", lit, S->nVars); exit (0); }
     if (!lit) {
+      int pivot = buffer[0];
       buffer[size] = 0;
       qsort (buffer, size, sizeof (int), compare);
       int j = 0;
@@ -693,7 +724,7 @@ int parse (struct solver* S) {
       if (S->mem_used + size + EXTRA > DBsize) { DBsize = (DBsize * 3) >> 1;
 	S->DB = (int *) realloc (S->DB, DBsize * sizeof (int)); }
       int *clause = &S->DB[S->mem_used + EXTRA - 1];
-      if (size != 0) clause[PIVOT] = buffer[0];
+      if (size != 0) clause[PIVOT] = pivot;
       clause[ID] = 2 * S->count; S->count++;
       if (S->mode == FORWARD_SAT) if (nZeros > 0) clause[ID] |= ACTIVE;
 
@@ -854,6 +885,7 @@ int main (int argc, char** argv) {
   S.mode      = BACKWARD_UNSAT;
   S.delete    = 1;
   S.binMode   = 0;
+  S.traceMode = 0;
   gettimeofday (&S.start_time, NULL);
 
   int i, tmp = 0;
