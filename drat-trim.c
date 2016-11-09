@@ -140,7 +140,7 @@ void analyze (struct solver* S, int* clause, int index) {     // Mark all clause
           S->reason[ abs (lit) ] = 0; } }
     else if (S->false[ lit ] == ASSUMED && !S->RATmode) {
       S->delLit++;
-      if (S->lemmaFile || S->traceFile || lratFile) {
+      if (S->lemmaFile || S->traceFile || S->lratFile) {
         int *tmp = S->current;
         while (*tmp != lit) tmp++;
         while (*tmp) { tmp[0] = tmp[1]; tmp++; }
@@ -308,15 +308,19 @@ void postprocess (struct solver *S) {
   printNoCore (S);   // closes lratFile
   printTrace  (S); } // closes traceFile
 
-void printDependencies (struct solver *S, int* clause, int RATflag) {
-  if (S->traceFile) {
+void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode) {
+  FILE *file = NULL;
+  if (mode == 0) file = S->traceFile;
+  if (mode == 1) file = S->lratFile;
+
+  if (file) {
     int i, j;
     if (clause != NULL) {
-      fprintf (S->traceFile, "%lu ", S->time >> 1);
-      while (*clause) fprintf (S->traceFile, "%i ", *clause++); }
+      fprintf (file, "%lu ", S->time >> 1);
+      while (*clause) fprintf (file, "%i ", *clause++); }
     else {
-      fprintf (S->traceFile, "%u ", S->count - 1); }
-    fprintf (S->traceFile, "0 ");
+      fprintf (file, "%u ", S->count - 1); }
+    fprintf (file, "0 ");
 
     // first print the preRAT units in order of becoming unit
     int size = 0;
@@ -328,14 +332,26 @@ void printDependencies (struct solver *S, int* clause, int RATflag) {
         if (S->preRAT[j] == cls) flag = 1;
       if (!flag) {
         S->preRAT[size++] = cls;
-        fprintf (S->traceFile, "%d ", cls >> 1); } }
+        fprintf (file, "%d ", cls >> 1); } }
 
     // print dependencies in order of becoming unit
     for (i = S->nDependencies - 1; i >= 0; i--) {
       int cls  = S->dependencies[i];
-      if (cls & 1)
-        fprintf (S->traceFile, "%d ", cls >> 1); }
-    fprintf (S->traceFile, "0\n"); } }
+      if ((mode == 0) && (cls < 0)) continue;
+      if (mode == 0) {
+        int flag = 0;
+        for (j = 0; j < size; j++)
+          if (S->preRAT[j] == cls) flag = 1;
+        if (!flag) {
+          S->preRAT[size++] = cls;
+          fprintf (file, "%d ", cls >> 1); } }
+      if ((mode == 1) && (cls & 1))
+        fprintf (file, "%d ", cls >> 1); }
+    fprintf (file, "0\n"); } }
+
+void printDependencies (struct solver *S, int* clause, int RATflag) {
+  printDependenciesFile (S, clause, RATflag, 0);
+  printDependenciesFile (S, clause, RATflag, 1); }
 
 int redundancyCheck (struct solver *S, int *clause, int size) {
   int i, indegree;
@@ -447,7 +463,7 @@ int redundancyCheck (struct solver *S, int *clause, int size) {
 
 int verify (struct solver *S) {
   long *delstack = NULL;
-  if (S->lemmaFile || S->traceFile) {
+  if (S->lemmaFile || S->traceFile || S->lratFile) {
     delstack = (long *) malloc (sizeof (long) * S->count * 2);
     S->delinfo = delstack;
     *S->delinfo++ = 0; }
@@ -577,7 +593,7 @@ int verify (struct solver *S) {
     if (seconds > S->timeout) printf ("s TIMEOUT\n"), exit (0);
 
     if (redundancyCheck (S, clause, size) == FAILED) return SAT;
-    if (S->lemmaFile || S->traceFile) *(S->delinfo++) = (ad >> INFOBITS) << 1; }
+    if (S->lemmaFile || S->traceFile || S->lratFile) *(S->delinfo++) = (ad >> INFOBITS) << 1; }
 
   postprocess (S);
   if (delstack) free (delstack);
