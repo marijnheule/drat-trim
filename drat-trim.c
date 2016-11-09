@@ -50,7 +50,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 struct solver { FILE *inputFile, *proofFile, *coreFile, *lemmaFile, *traceFile;
     int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode, traceMode,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, MARKcount,
-      Lcount, maxRAT, *RATset, maxDependencies, nDependencies,
+      Lcount, maxRAT, *RATset, *preRAT, maxDependencies, nDependencies,
       *dependencies, maxVar, mode, verb, unitSize, prep, *current, delLit, warning;
     struct timeval start_time;
     long mem_used, time, nClauses, lastLemma, *unitStack, *reason, lemmas, arcs, *adlist, **wlist, *delinfo;  };
@@ -108,16 +108,16 @@ static inline void markWatch (struct solver* S, int* clause, int index, int offs
     int *_clause = (S->DB + (*(watch++) >> 1) + (long) offset);
     if (_clause == clause) { watch[-1] |= ACTIVE; return; } } }
 
-static inline void addDependency (struct solver* S, int dep) {
+static inline void addDependency (struct solver* S, int dep, int forced) {
   if (S->traceFile) {
     if (S->nDependencies == S->maxDependencies) {
       S->maxDependencies = (S->maxDependencies * 3) >> 1;
       S->dependencies = realloc (S->dependencies, sizeof (int) * S->maxDependencies); }
-    S->dependencies[S->nDependencies++] = dep; } }
+    S->dependencies[S->nDependencies++] = (dep << 1) + forced; } }
 
 static inline void markClause (struct solver* S, int* clause, int index) {
   S->arcs++;
-  addDependency (S, clause[index - 1] >> 1);
+  addDependency (S, clause[index - 1] >> 1, (S->assigned > S->forced));
 
   if ((clause[index - 1] & ACTIVE) == 0) {
     S->MARKcount++;
@@ -319,14 +319,22 @@ void printDependencies (struct solver *S, int* clause, int RATflag) {
       fprintf (S->traceFile, "%u ", S->count - 1); }
     fprintf (S->traceFile, "0 ");
 
+    int size = 0;
+    for (i = S->nDependencies - 1; i >= 0; i--) {
+      int flag = 0;
+      int cls  = S->dependencies[i];
+      if (cls & 1) continue;
+      for (j = 0; j < size; j++)
+        if (S->preRAT[j] == cls) flag = 1;
+      if (!flag) {
+        S->preRAT[size++] = cls;
+        fprintf (S->traceFile, "%d ", cls >> 1); } }
+
     // print dependencies in order of becoming unit
     for (i = S->nDependencies - 1; i >= 0; i--) {
-      if (S->dependencies[i] != 0) {
-        fprintf (S->traceFile, "%d ", S->dependencies[i]);
-        if (0 & RATflag) { // only duplicate dependencies due to RAT
-          for (j = i - 1; j >= 0; j--)
-            if (S->dependencies[j] == S->dependencies[i])
-              S->dependencies[j] = 0; } } }
+      int cls  = S->dependencies[i];
+      if (cls & 1)
+        fprintf (S->traceFile, "%d ", cls >> 1); }
     fprintf (S->traceFile, "0\n"); } }
 
 int redundancyCheck (struct solver *S, int *clause, int size) {
@@ -423,19 +431,18 @@ int redundancyCheck (struct solver *S, int *clause, int size) {
         if (lit != -reslit && !S->false[lit]) {
           ASSIGN(-lit); S->reason[abs (lit)] = 0; } }
       if (propagate (S, 0) == SAT) { flag  = 0; break; } }
-    addDependency (S, -id); }
-
-  S->processed = S->forced = savedForced;
-  while (S->forced < S->assigned) S->false[*(--S->assigned)] = 0;
+    addDependency (S, -id, 1); }
 
   if (flag == 0) {
     if (S->verb) printf ("c RAT check failed\n");
     return FAILED; }
 
+  printDependencies (S, clause, 1);
+  S->processed = S->forced = savedForced;
+  while (S->forced < S->assigned) S->false[*(--S->assigned)] = 0;
+
   S->RATcount++;
   if (S->verb) printf ("c lemma has RAT on %i\n", reslit);
-
-  printDependencies (S, clause, 1);
   return SUCCEED; }
 
 int verify (struct solver *S) {
@@ -783,24 +790,26 @@ int parse (struct solver* S) {
   printf ("c finished parsing\n");
 
   int n = S->maxVar;
-  S->falseStack = (int*) malloc ((n + 1) * sizeof (int)); // Stack of falsified literals -- this pointer is never changed
-  S->forced     = S->falseStack;      // Points inside *falseStack at first decision (unforced literal)
-  S->processed  = S->falseStack;      // Points inside *falseStack at first unprocessed literal
-  S->assigned   = S->falseStack;      // Points inside *falseStack at last unprocessed literal
+  S->falseStack = (int *) malloc ((    n + 1) * sizeof (int )); // Stack of falsified literals -- this pointer is never changed
+  S->forced     = S->falseStack; // Points inside *falseStack at first decision (unforced literal)
+  S->processed  = S->falseStack; // Points inside *falseStack at first unprocessed literal
+  S->assigned   = S->falseStack; // Points inside *falseStack at last unprocessed literal
   S->reason     = (long*) malloc ((    n + 1) * sizeof (long)); // Array of clauses
   S->used       = (int *) malloc ((2 * n + 1) * sizeof (int )); S->used  += n; // Labels for variables, non-zero means false
   S->max        = (int *) malloc ((2 * n + 1) * sizeof (int )); S->max   += n; // Labels for variables, non-zero means false
   S->false      = (int *) malloc ((2 * n + 1) * sizeof (int )); S->false += n; // Labels for variables, non-zero means false
 
-  S->arcs      = 0;
-  S->RATmode   = 0;
-  S->RATcount  = 0;
-  S->MARKcount = 0;
-  S->COREcount = 0;
+  S->arcs       = 0;
+  S->RATmode    = 0;
+  S->RATcount   = 0;
+  S->MARKcount  = 0;
+  S->COREcount  = 0;
 
   S->maxRAT = INIT;
   S->RATset = (int*) malloc (sizeof (int) * S->maxRAT);
   for (i = 0; i < S->maxRAT; i++) S->RATset[i] = 0;
+
+  S->preRAT = (int*) malloc (sizeof (int) * n);
 
   S->maxDependencies = INIT;
   S->dependencies = (int*) malloc (sizeof (int) * S->maxDependencies);
