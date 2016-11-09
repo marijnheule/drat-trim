@@ -908,7 +908,6 @@ int main (int argc, char** argv) {
   S.mode      = BACKWARD_UNSAT;
   S.delete    = 1;
   S.binMode   = 0;
-  S.traceMode = 0;
   gettimeofday (&S.start_time, NULL);
 
   int i, tmp = 0;
