@@ -47,8 +47,8 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define NOWARNING	 60
 #define HARDWARNING	 70
 
-struct solver { FILE *inputFile, *proofFile, *coreFile, *lemmaFile, *traceFile;
-    int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode, traceMode,
+struct solver { FILE *inputFile, *proofFile, *coreFile, *lemmaFile, *lratFile, *traceFile;
+    int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, MARKcount,
       Lcount, maxRAT, *RATset, *preRAT, maxDependencies, nDependencies,
       *dependencies, maxVar, mode, verb, unitSize, prep, *current, delLit, warning;
@@ -109,7 +109,7 @@ static inline void markWatch (struct solver* S, int* clause, int index, int offs
     if (_clause == clause) { watch[-1] |= ACTIVE; return; } } }
 
 static inline void addDependency (struct solver* S, int dep, int forced) {
-  if (S->traceFile) {
+  if (S->traceFile || S->lratFile) {
     if (S->nDependencies == S->maxDependencies) {
       S->maxDependencies = (S->maxDependencies * 3) >> 1;
       S->dependencies = realloc (S->dependencies, sizeof (int) * S->maxDependencies); }
@@ -122,7 +122,7 @@ static inline void markClause (struct solver* S, int* clause, int index) {
   if ((clause[index - 1] & ACTIVE) == 0) {
     S->MARKcount++;
     clause[index - 1] |= ACTIVE;
-    if ((S->lemmaFile || S->traceFile) && clause[1])
+    if ((S->lemmaFile || S->traceFile || S->lratFile) && clause[1])
       *(S->delinfo++) = (((long) (clause - S->DB) + index) << 1) + 1;
     if (clause[1 + index] == 0) return;
     markWatch (S, clause,     index, -index);
@@ -140,7 +140,7 @@ void analyze (struct solver* S, int* clause, int index) {     // Mark all clause
           S->reason[ abs (lit) ] = 0; } }
     else if (S->false[ lit ] == ASSUMED && !S->RATmode) {
       S->delLit++;
-      if (S->lemmaFile || S->traceFile) {
+      if (S->lemmaFile || S->traceFile || lratFile) {
         int *tmp = S->current;
         while (*tmp != lit) tmp++;
         while (*tmp) { tmp[0] = tmp[1]; tmp++; }
@@ -262,33 +262,33 @@ void printProof (struct solver *S) {
     fclose (S->lemmaFile); }
 
   delinfo = S->delinfo;
-  if (S->traceFile && !S->traceMode) {
+  if (S->lratFile) {
     int index = S->nClauses;
     delinfo--;
     while (*delinfo) {
       long offset = *delinfo--;
       int *lemmas = S->DB + (offset >> 1);
       if ((offset & 1) == 0) {
-        if (index == 0) fprintf (S->traceFile, "0\n");
+        if (index == 0) fprintf (S->lratFile, "0\n");
         index = lemmas[ID] >> 1;
         continue; }
       if (!lemmas[1] && (offset & 1)) continue; // don't delete unit clauses
       if (offset & 1) {
         if (index != 0)
-          fprintf (S->traceFile, "%i d ", index);
-        fprintf (S->traceFile, "%i ", lemmas[ID] >> 1);
+          fprintf (S->lratFile, "%i d ", index);
+        fprintf (S->lratFile, "%i ", lemmas[ID] >> 1);
         index = 0; } }
-      fprintf(S->traceFile, "0\n"); } }
+      fprintf(S->lratFile, "0\n"); } }
 
 void printNoCore (struct solver *S) {
-  if (S->traceFile) { int i;
-    fprintf (S->traceFile, "%ld d ", S->nClauses);
+  if (S->lratFile) { int i;
+    fprintf (S->lratFile, "%ld d ", S->nClauses);
     for (i = 0; i < S->nClauses; i++) {
       int *lemmas = S->DB + (S->adlist[i] >> INFOBITS);
       if ((lemmas[ID] & ACTIVE) == 0)
-        fprintf (S->traceFile, "%i ", lemmas[ID] >> 1); }
-    fprintf (S->traceFile, "0\n");
-    fclose (S->traceFile); } }
+        fprintf (S->lratFile, "%i ", lemmas[ID] >> 1); }
+    fprintf (S->lratFile, "0\n");
+    fclose (S->lratFile); } }
 
 // print the dependency graph to traceFile in TraceCheck+ format
 // this procedure adds the active clauses at the end of the trace
@@ -303,15 +303,14 @@ void printTrace (struct solver *S) {
     fclose (S->traceFile); } }
 
 void postprocess (struct solver *S) {
-  printCore  (S);
-  printProof (S);
-  if (!S->traceMode) printNoCore (S);
-  else               printTrace (S); }
+  printCore   (S);
+  printProof  (S);   // closes lemmasFile
+  printNoCore (S);   // closes lratFile
+  printTrace  (S); } // closes traceFile
 
 void printDependencies (struct solver *S, int* clause, int RATflag) {
-  if (S->traceFile) {  // This is quadratic, can be n log n
+  if (S->traceFile) {
     int i, j;
-
     if (clause != NULL) {
       fprintf (S->traceFile, "%lu ", S->time >> 1);
       while (*clause) fprintf (S->traceFile, "%i ", *clause++); }
@@ -319,6 +318,7 @@ void printDependencies (struct solver *S, int* clause, int RATflag) {
       fprintf (S->traceFile, "%u ", S->count - 1); }
     fprintf (S->traceFile, "0 ");
 
+    // first print the preRAT units in order of becoming unit
     int size = 0;
     for (i = S->nDependencies - 1; i >= 0; i--) {
       int flag = 0;
@@ -875,8 +875,9 @@ void printHelp ( ) {
   printf ("where <option> is one of the following\n\n");
   printf ("  -h          print this command line option summary\n");
   printf ("  -c CORE     prints the unsatisfiable core to the file CORE\n");
-  printf ("  -l LEMMAS   prints the core lemmas to the file LEMMAS\n");
-  printf ("  -r TRACE    resolution graph in TRACECHECK format\n\n");
+  printf ("  -l LEMMAS   prints the core lemmas to the file LEMMAS (DRAT format)\n");
+  printf ("  -L LEMMAS   prints the core lemmas to the file LEMMAS (LRAT format)\n");
+  printf ("  -r TRACE    resolution graph in the TRACE file (TRACECHECK format)\n\n");
   printf ("  -t <lim>    time limit in seconds (default %i)\n", TIMEOUT);
   printf ("  -u          default unit propatation (i.e., no core-first)\n");
   printf ("  -f          forward mode for UNSAT\n");
@@ -897,6 +898,7 @@ int main (int argc, char** argv) {
   S.proofFile = stdin;
   S.coreFile  = NULL;
   S.lemmaFile = NULL;
+  S.lratFile  = NULL;
   S.traceFile = NULL;
   S.timeout   = TIMEOUT;
   S.mask      = 0;
@@ -915,6 +917,7 @@ int main (int argc, char** argv) {
       if      (argv[i][1] == 'h') printHelp ();
       else if (argv[i][1] == 'c') S.coreFile  = fopen (argv[++i], "w");
       else if (argv[i][1] == 'l') S.lemmaFile = fopen (argv[++i], "w");
+      else if (argv[i][1] == 'L') S.lratFile  = fopen (argv[++i], "w");
       else if (argv[i][1] == 'r') S.traceFile = fopen (argv[++i], "w");
       else if (argv[i][1] == 't') S.timeout   = atoi (argv[++i]);
       else if (argv[i][1] == 'u') S.mask      = 1;
