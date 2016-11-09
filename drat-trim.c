@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
 Copyright (c) 2015-2016 Marijn Heule, The University of Texas at Austin.
-Last edit, November 8, 2016
+Last edit, November 9, 2016
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -50,7 +50,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 struct solver { FILE *inputFile, *proofFile, *coreFile, *lemmaFile, *traceFile;
     int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode, traceMode,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, MARKcount,
-      Lcount, maxCandidates, *resolutionCandidates, maxDependencies, nDependencies,
+      Lcount, maxRAT, *RATset, maxDependencies, nDependencies,
       *dependencies, maxVar, mode, verb, unitSize, prep, *current, delLit, warning;
     struct timeval start_time;
     long mem_used, time, nClauses, lastLemma, *unitStack, *reason, lemmas, arcs, *adlist, **wlist, *delinfo;  };
@@ -60,6 +60,9 @@ struct solver { FILE *inputFile, *proofFile, *coreFile, *lemmaFile, *traceFile;
 #define ADD_WATCH(l,m)  { if (S->used[(l)] + 1 == S->max[(l)]) { S->max[(l)] *= 1.5; \
                             S->wlist[(l)] = (long *) realloc (S->wlist[(l)], sizeof (long) * S->max[(l)]); } \
                           S->wlist[(l)][ S->used[(l)]++ ] = (m); S->wlist[(l)][ S->used[(l)] ] = END; }
+
+int compare (const void *a, const void *b) {
+  return (*(int*)a - *(int*)b); }
 
 static inline void printClause (int* clause) {
   printf ("[%i] ", clause[ID]);
@@ -105,13 +108,16 @@ static inline void markWatch (struct solver* S, int* clause, int index, int offs
     int *_clause = (S->DB + (*(watch++) >> 1) + (long) offset);
     if (_clause == clause) { watch[-1] |= ACTIVE; return; } } }
 
-static inline void markClause (struct solver* S, int* clause, int index) {
-  S->arcs++;
+static inline void addDependency (struct solver* S, int dep) {
   if (S->traceFile) {
     if (S->nDependencies == S->maxDependencies) {
       S->maxDependencies = (S->maxDependencies * 3) >> 1;
       S->dependencies = realloc (S->dependencies, sizeof (int) * S->maxDependencies); }
-    S->dependencies[S->nDependencies++] = clause[index - 1] >> 1; }
+    S->dependencies[S->nDependencies++] = dep; } }
+
+static inline void markClause (struct solver* S, int* clause, int index) {
+  S->arcs++;
+  addDependency (S, clause[index - 1] >> 1);
 
   if ((clause[index - 1] & ACTIVE) == 0) {
     S->MARKcount++;
@@ -271,14 +277,15 @@ void printProof (struct solver *S) {
         if (index != 0)
           fprintf (S->traceFile, "%i d ", index);
         fprintf (S->traceFile, "%i ", lemmas[ID] >> 1);
-        index = 0; } } } }
+        index = 0; } }
+      fprintf(S->traceFile, "0\n"); } }
 
 void printNoCore (struct solver *S) {
   if (S->traceFile) { int i;
     fprintf (S->traceFile, "%ld d ", S->nClauses);
     for (i = 0; i < S->nClauses; i++) {
       int *lemmas = S->DB + (S->adlist[i] >> INFOBITS);
-      if (lemmas[ID] & ACTIVE == 0)
+      if ((lemmas[ID] & ACTIVE) == 0)
         fprintf (S->traceFile, "%i ", lemmas[ID] >> 1); }
     fprintf (S->traceFile, "0\n");
     fclose (S->traceFile); } }
@@ -298,8 +305,8 @@ void printTrace (struct solver *S) {
 void postprocess (struct solver *S) {
   printCore  (S);
   printProof (S);
-  if (S->traceMode == 0) printNoCore (S);
-  else                   printTrace (S); }
+  if (!S->traceMode) printNoCore (S);
+  else               printTrace (S); }
 
 void printDependencies (struct solver *S, int* clause, int RATflag) {
   if (S->traceFile) {  // This is quadratic, can be n log n
@@ -316,7 +323,7 @@ void printDependencies (struct solver *S, int* clause, int RATflag) {
     for (i = S->nDependencies - 1; i >= 0; i--) {
       if (S->dependencies[i] != 0) {
         fprintf (S->traceFile, "%d ", S->dependencies[i]);
-        if (RATflag) { // only duplicate dependencies due to RAT
+        if (0 & RATflag) { // only duplicate dependencies due to RAT
           for (j = i - 1; j >= 0; j--)
             if (S->dependencies[j] == S->dependencies[i])
               S->dependencies[j] = 0; } } }
@@ -365,7 +372,7 @@ int redundancyCheck (struct solver *S, int *clause, int size, int uni) {
 
   if (falsePivot) return FAILED;
 
-  int j, blocked, numCandidates = 0;
+  int j, nRAT = 0; // blocked, nRAT = 0;
   long int reason;
   int* savedForced = S->forced;
 
@@ -377,39 +384,46 @@ int redundancyCheck (struct solver *S, int *clause, int size, int uni) {
     if (i == 0) continue;
     // Loop over all watched clauses for literal
     for (j = 0; j < S->used[i]; j++) {
-      int* watchedClause = S->DB + (S->wlist[i][j] >> 1);
-      if ((*watchedClause == i) && (watchedClause[ID] & ACTIVE)) { // If watched literal is in first position
-        int flag = 0;
-        blocked = 0;
-        reason = 0;
-	while (*watchedClause) {
-          int lit = *watchedClause++;
-          if (lit == -reslit) flag = 1;
-	  else if (S->false[-lit]) { // Unless some other literal is satisfied
-            if (blocked == 0 || reason > S->reason[abs (lit)])
-              blocked = lit, reason = S->reason[abs (lit)]; } }
+      int* watched = S->DB + (S->wlist[i][j] >> 1);
+      int id = watched[ID] >> 1;
+      if ((*watched == i) && (watched[ID] & ACTIVE)) // If watched literal is in first position
+	while (*watched)
+          if (*watched++ == -reslit) {
+	    if (nRAT == S->maxRAT) {
+	      S->maxRAT = (S->maxRAT * 3) >> 1;
+	      S->RATset = realloc (S->RATset, sizeof (int) * S->maxRAT); }
+	    S->RATset[nRAT++] = S->wlist[i][j] >> 1;
+            break; } } }
 
-       if (blocked != 0 && reason != 0 && flag == 1) {
-         analyze (S, S->DB + reason, -1); S->reason[abs (blocked)] = 0; }
-
-       // If resolution candidate, add to list
-       if (blocked == 0 && flag == 1) {
-	 if (numCandidates == S->maxCandidates) {
-	   S->maxCandidates = (S->maxCandidates * 3) >> 1;
-	    S->resolutionCandidates = realloc (S->resolutionCandidates,
-	    			      sizeof (int) * S->maxCandidates); }
-	    S->resolutionCandidates[numCandidates++] = S->wlist[i][j] >> 1; } } } }
-
-  // Check all candidates for RUP
+  // Check all clauses in RATset for RUP
   int flag = 1;
-  for (i = 0; i < numCandidates; i++) {
-    int* candidate = S->DB + S->resolutionCandidates[i];
+  qsort (S->RATset, nRAT, sizeof (int), compare);
+  for (i = nRAT - 1; i >= 0; i--) {
+    int* RATcls = S->DB + S->RATset[i];
+    int id = RATcls[ID] >> 1;
+    int blocked = 0;
+    int reason  = 0;
     if (S->verb) {
-      printf ("c candidate: "); printClause (candidate); }
-    while (*candidate) { int lit = *candidate++;
-      if (lit != -reslit && !S->false[lit]) {
-        ASSIGN(-lit); S->reason[abs (lit)] = 0; } }
-    if (propagate (S, 0) == SAT) { flag  = 0; break; } }
+      printf ("c RAT clause: "); printClause (RATcls); }
+
+    while (*RATcls) {
+      int lit = *RATcls++;
+      if (lit != -reslit && S->false[-lit])
+        if (!blocked || reason > S->reason[abs (lit)])
+          blocked = lit, reason = S->reason[abs (lit)]; }
+
+    if (blocked && reason) {
+      analyze (S, S->DB + reason, -1);
+      S->reason[abs (blocked)] = 0; }
+
+    if (!blocked) {
+      RATcls = S->DB + S->RATset[i];
+      while (*RATcls) {
+        int lit = *RATcls++;
+        if (lit != -reslit && !S->false[lit]) {
+          ASSIGN(-lit); S->reason[abs (lit)] = 0; } }
+      if (propagate (S, 0) == SAT) { flag  = 0; break; } }
+    addDependency (S, -id); }
 
   S->processed = S->forced = savedForced;
   while (S->forced < S->assigned) S->false[*(--S->assigned)] = 0;
@@ -519,6 +533,7 @@ int verify (struct solver *S) {
   printf ("c detected empty clause; start verification via backward checking\n");
 
   S->forced = S->processed;
+  *S->delinfo++ = 0;
 
   for (; checked >= S->nClauses; checked--) {
     long ad = S->adlist[ checked ]; long d = ad & 1; long uni = 0;
@@ -560,9 +575,6 @@ int verify (struct solver *S) {
   postprocess (S);
   if (delstack) free (delstack);
   return UNSAT; }
-
-int compare (const void *a, const void *b) {
-  return (*(int*)a - *(int*)b); }
 
 long matchClause (struct solver* S, long *clauselist, int listsize, int* input, int size) {
   int i, j;
@@ -786,9 +798,9 @@ int parse (struct solver* S) {
   S->MARKcount = 0;
   S->COREcount = 0;
 
-  S->maxCandidates = INIT;
-  S->resolutionCandidates = (int*) malloc (sizeof (int) * S->maxCandidates);
-  for (i = 0; i < S->maxCandidates; i++) S->resolutionCandidates[i] = 0;
+  S->maxRAT = INIT;
+  S->RATset = (int*) malloc (sizeof (int) * S->maxRAT);
+  for (i = 0; i < S->maxRAT; i++) S->RATset[i] = 0;
 
   S->maxDependencies = INIT;
   S->dependencies = (int*) malloc (sizeof (int) * S->maxDependencies);
@@ -845,7 +857,7 @@ void freeMemory (struct solver *S) {
   free (S->max   - S->maxVar);
   free (S->false - S->maxVar);
   free (S->wlist - S->maxVar);
-  free (S->resolutionCandidates);
+  free (S->RATset);
   free (S->dependencies);
   return; }
 
