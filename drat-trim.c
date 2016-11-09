@@ -84,7 +84,7 @@ static inline void removeWatch (struct solver* S, int* clause, int index) {
       S->wlist[lit][ S->used[lit] ] = END; return; } } }
 
 static inline void addUnit (struct solver* S, long index) {
-  S->unitStack[ S->unitSize++ ] = index; }
+  S->unitStack[S->unitSize++] = index; }
 
 static inline void removeUnit (struct solver* S, int lit) {
   int i, found = 0;
@@ -329,7 +329,7 @@ void printDependencies (struct solver *S, int* clause, int RATflag) {
               S->dependencies[j] = 0; } } }
     fprintf (S->traceFile, "0\n"); } }
 
-int redundancyCheck (struct solver *S, int *clause, int size, int uni) {
+int redundancyCheck (struct solver *S, int *clause, int size) {
   int i, indegree;
   int falsePivot = S->false[ clause[PIVOT] ];
   if (S->verb) { printf ("c checking lemma (%i, %i) ", size, clause[PIVOT]); printClause (clause); }
@@ -492,11 +492,11 @@ int verify (struct solver *S) {
 
     if (d && S->mode == FORWARD_SAT) {
       if (size == -1) propagateUnits (S, 0);  // necessary?
-      if (redundancyCheck (S, lemmas, size, 0) == FAILED) return SAT;
+      if (redundancyCheck (S, lemmas, size) == FAILED) return SAT;
       continue; }
 
     if (d == 0 && S->mode == FORWARD_UNSAT) {
-      if (redundancyCheck (S, lemmas, size, 0) == FAILED) return SAT;
+      if (redundancyCheck (S, lemmas, size) == FAILED) return SAT;
       size = sortSize (S, lemmas, -2 * d + 1);
       S->nDependencies = 0; }
 
@@ -569,7 +569,7 @@ int verify (struct solver *S) {
     int seconds = (int) (current_time.tv_sec - S->start_time.tv_sec);
     if (seconds > S->timeout) printf ("s TIMEOUT\n"), exit (0);
 
-    if (redundancyCheck (S, clause, size, uni) == FAILED) return SAT;
+    if (redundancyCheck (S, clause, size) == FAILED) return SAT;
     if (S->lemmaFile || S->traceFile) *(S->delinfo++) = (ad >> INFOBITS) << 1; }
 
   postprocess (S);
@@ -609,7 +609,7 @@ int read_lit (FILE *proofFile, int *lit) {
 
 int parse (struct solver* S) {
   int tmp, active = 0, retvalue = SAT;
-  int del = 0, uni = 0;
+  int del = 0;
   int *buffer, bsize;
 
   do { tmp = fscanf (S->inputFile, " cnf %i %li \n", &S->nVars, &S->nClauses); // Read the first line
@@ -711,11 +711,11 @@ int parse (struct solver* S) {
           printf ("c WARNING: backward mode ignores deletion of (pseudo) unit clause ");
           printClause (buffer); }
         if (S->warning == HARDWARNING) exit (HARDWARNING);
-        del = 0; uni = 0; size = 0; continue; }
+        del = 0; size = 0; continue; }
       int rem = buffer[0];
       buffer[ size ] = 0;
       unsigned int hash = getHash (buffer);
-      if (del || uni) {
+      if (del) {
         if (S->delete) {
           long match = 0;
             match = matchClause (S, hashTable[hash], hashUsed[hash], buffer, size);
@@ -731,7 +731,7 @@ int parse (struct solver* S) {
               S->adlist = (long*) realloc (S->adlist, sizeof (long) * admax); }
             S->adlist[ S->lastLemma++ ] = (match << INFOBITS) + 1; }
         end_delete:;
-        if (del) { del = 0; uni = 0; size = 0; continue; } }
+        if (del) { del = 0; size = 0; continue; } }
 
       if (S->mem_used + size + EXTRA > DBsize) { DBsize = (DBsize * 3) >> 1;
 	S->DB = (int *) realloc (S->DB, DBsize * sizeof (int)); }
@@ -751,11 +751,11 @@ int parse (struct solver* S) {
       active++;
       if (S->lastLemma == admax) { admax = (admax * 3) >> 1;
         S->adlist = (long*) realloc (S->adlist, sizeof (long) * admax); }
-      S->adlist[ S->lastLemma++ ] = (((long) (clause - S->DB)) << INFOBITS) + 2 * uni;
+      S->adlist[ S->lastLemma++ ] = (((long) (clause - S->DB)) << INFOBITS);
       if (nZeros <= 0) S->Lcount++;
 
       if (!nZeros) S->lemmas   = (long) (clause - S->DB);    // S->lemmas is no longer pointer
-      size = 0; del = 0; uni = 0; --nZeros; }                // Reset buffer
+      size = 0; del = 0; --nZeros; }                // Reset buffer
    else buffer[ size++ ] = lit; }                            // Add literal to buffer
 
   if (S->mode == FORWARD_SAT && active) {
