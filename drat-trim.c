@@ -127,25 +127,25 @@ static inline void markClause (struct solver* S, int* clause, int index) {
     if (clause[1 + index] == 0) return;
     markWatch (S, clause,     index, -index);
     markWatch (S, clause, 1 + index, -index); }
-  while (*clause) S->false[ *(clause++) ] = MARK; }
+  while (*clause) S->false[*(clause++)] = MARK; }
 
 void analyze (struct solver* S, int* clause, int index) {     // Mark all clauses involved in conflict
   markClause (S, clause, index);
   while (S->assigned > S->falseStack) {
     int lit = *(--S->assigned);
-    if (S->false[ lit ] == MARK) {
-      if (S->reason[ abs (lit) ]) {
-        markClause (S, S->DB+S->reason[ abs (lit) ], -1);
+    if (S->false[lit] == MARK) {
+      if (S->reason[abs (lit)]) {
+        markClause (S, S->DB + S->reason[abs (lit)], -1);
         if (S->assigned >= S->forced)
-          S->reason[ abs (lit) ] = 0; } }
-    else if (S->false[ lit ] == ASSUMED && !S->RATmode) {
+          S->reason[abs (lit)] = 0; } }
+    else if (S->false[lit] == ASSUMED && !S->RATmode) { // Remove unused literal
       S->delLit++;
       if (S->lemmaFile || S->traceFile || S->lratFile) {
         int *tmp = S->current;
         while (*tmp != lit) tmp++;
         while (*tmp) { tmp[0] = tmp[1]; tmp++; }
         tmp[-1] = 0; } }
-    S->false[ lit ] = (S->assigned < S->forced); }
+    S->false[lit] = (S->assigned < S->forced); }
 
   S->processed = S->assigned = S->forced; }
 
@@ -314,7 +314,7 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
   if (mode == 1) file = S->lratFile;
 
   if (file) {
-    int i, j;
+    int i, j, k;
     if (clause != NULL) {
       fprintf (file, "%lu ", S->time >> 1);
       int reslit = clause[PIVOT];
@@ -329,19 +329,22 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
 
     // first print the preRAT units in order of becoming unit
     int size = 0;
-    for (i = S->nDependencies - 1; i >= 0; i--) {
-      int flag = 0;
-      int cls  = S->dependencies[i];
-      if (cls & 1) continue;
-      for (j = 0; j < size; j++)
-        if (S->preRAT[j] == cls) flag = 1;
-      if (!flag) {
-        S->preRAT[size++] = cls;
-        fprintf (file, "%d ", cls >> 1); } }
+//    for (i = S->nDependencies - 1; i >= 0; i--) {
+    for (i = 0; i <= S->nDependencies; i++) {
+      if (S->dependencies[i] > 0) continue;
+      for (j = i - 1; j >= 0 && S->dependencies[j] > 0; j--) {
+        int flag = 0;
+        int cls  = S->dependencies[j];
+        if (cls & 1) continue;
+        for (k = 0; k < size; k++)
+          if (S->preRAT[k] == cls) flag = 1;
+        if (!flag) {
+          S->preRAT[size++] = cls;
+          fprintf (file, "%d ", cls >> 1); } } }
 
     // print dependencies in order of becoming unit
     for (i = S->nDependencies - 1; i >= 0; i--) {
-      int cls  = S->dependencies[i];
+      int cls = S->dependencies[i];
       if ((mode == 0) && (cls < 0)) continue;
       if (mode == 0) {
         int flag = 0;
