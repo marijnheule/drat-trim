@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
 Copyright (c) 2015-2016 Marijn Heule, The University of Texas at Austin.
-Last edit, November 9, 2016
+Last edit, November 10, 2016
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -397,7 +397,7 @@ int redundancyCheck (struct solver *S, int *clause, int size) {
   // printf ("RUP check failed.  Starting RAT check.\n");
   int reslit = clause[PIVOT];
   if (S->verb)
-    printf ("c RUP checked failed; resolution literal %d.\n", reslit);
+    printf ("c RUP checked failed; starting RAT check on pivot %d.\n", reslit);
 
   if (falsePivot) return FAILED;
 
@@ -415,14 +415,18 @@ int redundancyCheck (struct solver *S, int *clause, int size) {
     for (j = 0; j < S->used[i]; j++) {
       int* watched = S->DB + (S->wlist[i][j] >> 1);
       int id = watched[ID] >> 1;
-      if ((*watched == i) && (watched[ID] & ACTIVE)) // If watched literal is in first position
+      int active = watched[ID] & ACTIVE;
+      if (*watched == i) { // If watched literal is in first position
 	while (*watched)
           if (*watched++ == -reslit) {
+            if ((S->mode == BACKWARD_UNSAT) && !active) {
+              printf ("c ignoring clause : "); printClause (S->DB + (S->wlist[i][j] >> 1));
+              continue; }
 	    if (nRAT == S->maxRAT) {
 	      S->maxRAT = (S->maxRAT * 3) >> 1;
 	      S->RATset = realloc (S->RATset, sizeof (int) * S->maxRAT); }
 	    S->RATset[nRAT++] = S->wlist[i][j] >> 1;
-            break; } } }
+            break; } } } }
 
   // Check all clauses in RATset for RUP
   int flag = 1;
@@ -496,9 +500,9 @@ int verify (struct solver *S) {
       if (S->verb)
         printf ("c found unit in proof %i (%li)\n", lit, d);
       if (d) {
-        if (S->mode == FORWARD_SAT) {
+        if (S->mode == FORWARD_SAT) { // also for FORWARD_UNSAT ?
           removeUnit (S, lit); propagateUnits (S, 0); }
-        else {  // no need to remove units while checking UNSAT
+        else { // no need to remove units while checking UNSAT
           S->adlist[ checked ] = 0; continue; } }
       else {
         if (S->mode == BACKWARD_UNSAT && S->false[-lit]) { S->adlist[checked] = 0; continue; }
@@ -508,10 +512,11 @@ int verify (struct solver *S) {
       if ((S->reason[abs (lemmas[0])] - 1) == (lemmas - S->DB)) {
         if (S->mode == BACKWARD_UNSAT) { // ignore pseudo unit clause deletion
           S->adlist[ checked ] = 0; }
-        else if (S->mode == FORWARD_SAT) {
+        else { // if (S->mode == FORWARD_SAT) { // also for FORWARD_UNSAT?
           removeWatch (S, lemmas, 0), removeWatch (S, lemmas, 1);
           propagateUnits (S, 0); } }
       else {
+//        printf("c removing clause : "); printClause (lemmas);
         removeWatch (S, lemmas, 0), removeWatch (S, lemmas, 1); }
       if (S->mode == FORWARD_UNSAT)  continue;
       if (S->mode == BACKWARD_UNSAT) continue; }
