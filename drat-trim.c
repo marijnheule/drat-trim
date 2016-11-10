@@ -317,7 +317,12 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
     int i, j;
     if (clause != NULL) {
       fprintf (file, "%lu ", S->time >> 1);
-      while (*clause) fprintf (file, "%i ", *clause++); }
+      int reslit = clause[PIVOT];
+      fprintf (file, "%i ", reslit);
+      while (*clause) {
+        int lit = *clause++;
+        if (lit != reslit)
+          fprintf (file, "%i ", lit); } }
     else {
       fprintf (file, "%u ", S->count - 1); }
     fprintf (file, "0 ");
