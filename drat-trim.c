@@ -327,10 +327,19 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
       fprintf (file, "%u ", S->count - 1); }
     fprintf (file, "0 ");
 
+    int isRUP = 1;
+    for (i = 0; i < S->nDependencies; i++)
+      if (S->dependencies[i] < 0) { isRUP = 0; break; }
+
+    if (isRUP) {
+      for (i = S->nDependencies - 1; i >= 0; i--)
+        fprintf (file, "%d ", S->dependencies[i] >> 1);
+      fprintf (file, "0\n");
+      return; }
+
     // first print the preRAT units in order of becoming unit
     int size = 0;
-//    for (i = S->nDependencies - 1; i >= 0; i--) {
-    for (i = 0; i <= S->nDependencies; i++) {
+    for (i = 0; i < S->nDependencies; i++) {
       if (S->dependencies[i] > 0) continue;
       for (j = i - 1; j >= 0 && S->dependencies[j] > 0; j--) {
         int flag = 0;
