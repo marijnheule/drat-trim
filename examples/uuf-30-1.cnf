@@ -1,12 +1,3 @@
-c This is UnifRandomKSATGenerator
-c uniform random 3-SAT generated instance with: 
-c clause length: 3 
-c number variables: 30 
-c number clauses: 128 
-c clause to variable ratio: 4.267 
-c random number generator name: SHA1PRNG 
-c random number generator provider: SUN 
-c random number generator seed: 1961850127779724045 
 p cnf 30 128
 -7 23 15 0
 -25 -5 21 0
