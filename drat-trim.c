@@ -556,7 +556,8 @@ int verify (struct solver *S) {
   printf ("c detected empty clause; start verification via backward checking\n");
 
   S->forced = S->processed;
-  *S->delinfo++ = 0;
+  if (S->lemmaFile || S->traceFile || S->lratFile)
+    *S->delinfo++ = 0;
 
   for (; checked >= S->nClauses; checked--) {
     long ad = S->adlist[ checked ]; long d = ad & 1; long uni = 0;
