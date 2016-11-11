@@ -121,9 +121,10 @@ static inline void markClause (struct solver* S, int* clause, int index) {
 
   if ((clause[index - 1] & ACTIVE) == 0) {
     S->MARKcount++;
+//    printf("c making active clause : "); printClause (clause - 1);
     clause[index - 1] |= ACTIVE;
-    if ((S->lemmaFile || S->traceFile || S->lratFile) && clause[1])
-      *(S->delinfo++) = (((long) (clause - S->DB) + index) << 1) + 1;
+    if ((S->lemmaFile || S->traceFile || S->lratFile) && clause[index + 1]) {
+      *(S->delinfo++) = (((long) (clause - S->DB) + index) << 1) + 1; }
     if (clause[1 + index] == 0) return;
     markWatch (S, clause,     index, -index);
     markWatch (S, clause, 1 + index, -index); }
