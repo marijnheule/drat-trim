@@ -433,7 +433,7 @@ int redundancyCheck (struct solver *S, int *clause, int size) {
 	while (*watched)
           if (*watched++ == -reslit) {
             if ((S->mode == BACKWARD_UNSAT) && !active) {
-              printf ("c ignoring clause : "); printClause (S->DB + (S->wlist[i][j] >> 1));
+              printf ("c RAT check ignores unmarked clause : "); printClause (S->DB + (S->wlist[i][j] >> 1));
               continue; }
 	    if (nRAT == S->maxRAT) {
 	      S->maxRAT = (S->maxRAT * 3) >> 1;
