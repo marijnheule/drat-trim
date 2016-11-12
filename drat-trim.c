@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
 Copyright (c) 2015-2016 Marijn Heule, The University of Texas at Austin.
-Last edit, November 10, 2016
+Last edit, November 11, 2016
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -659,10 +659,15 @@ int parse (struct solver* S) {
   int del = 0;
   int *buffer, bsize;
 
+  S->nVars    = 0;
+  S->nClauses = 0;
   do { tmp = fscanf (S->inputFile, " cnf %i %li \n", &S->nVars, &S->nClauses); // Read the first line
     if (tmp > 0 && tmp != EOF) break; tmp = fscanf (S->inputFile, "%*s\n"); }  // In case a commment line was found
   while (tmp != 2 && tmp != EOF);                                              // Skip it and read next line
   int nZeros = S->nClauses;
+
+  if (!S->nVars && !S->nClauses) {
+    printf ("c ERROR: did not find p cnf line in input file\n"); exit (0); }
 
   printf ("c parsing input formula with %i variables and %li clauses\n", S->nVars, S->nClauses);
 
