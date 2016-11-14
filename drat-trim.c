@@ -205,12 +205,12 @@ static inline int propagateUnits (struct solver* S, int init) {
 // assignment: negative size means satisfied, size = 0 means falsified
 int sortSize (struct solver *S, int *lemma, int diff) {
   unsigned int size = 0, last = 0, sat = 1;
-  while (lemma[ last ]) {
-    int lit = lemma[ last++ ];
-    if (S->false[ lit ] == 0) {
-      if (S->false[ -lit ]) sat = -1;
-      lemma[ last-1 ] = lemma[ size ];
-      lemma[ size++ ] = lit; } }
+  while (lemma[last]) {
+    int lit = lemma[last++];
+    if (S->false[lit] == 0) {
+      if (S->false[-lit]) sat = -1;
+      lemma[last-1] = lemma[ size ];
+      lemma[size++] = lit; } }
   return sat * size; }
 
 // print the core clauses to coreFile in DIMACS format
@@ -371,9 +371,70 @@ void printDependencies (struct solver *S, int* clause, int RATflag) {
   printDependenciesFile (S, clause, RATflag, 0);
   printDependenciesFile (S, clause, RATflag, 1); }
 
+int checkRAT (struct solver *S, int pivot) {
+  int i, j, nRAT = 0;
+
+  // Loop over all literals to calculate resolution candidates
+  for (i = -S->maxVar; i <= S->maxVar; i++) {
+    if (i == 0) continue;
+    // Loop over all watched clauses for literal
+    for (j = 0; j < S->used[i]; j++) {
+      int* watched = S->DB + (S->wlist[i][j] >> 1);
+      int id = watched[ID] >> 1;
+      int active = watched[ID] & ACTIVE;
+      if (*watched == i) { // If watched literal is in first position
+	while (*watched)
+          if (*watched++ == -pivot) {
+            if ((S->mode == BACKWARD_UNSAT) && !active) {
+              printf ("c RAT check ignores unmarked clause : "); printClause (S->DB + (S->wlist[i][j] >> 1));
+              continue; }
+	    if (nRAT == S->maxRAT) {
+	      S->maxRAT = (S->maxRAT * 3) >> 1;
+	      S->RATset = realloc (S->RATset, sizeof (int) * S->maxRAT); }
+	    S->RATset[nRAT++] = S->wlist[i][j] >> 1;
+            break; } } } }
+
+  // Check all clauses in RATset for RUP
+  int flag = 1;
+  qsort (S->RATset, nRAT, sizeof (int), compare);
+  S->nDependencies = 0;
+  for (i = nRAT - 1; i >= 0; i--) {
+    int* RATcls = S->DB + S->RATset[i];
+    int id = RATcls[ID] >> 1;
+    int blocked = 0;
+    long int reason  = 0;
+    if (S->verb) {
+      printf ("c RAT clause: "); printClause (RATcls); }
+
+    while (*RATcls) {
+      int lit = *RATcls++;
+      if (lit != -pivot && S->false[-lit])
+        if (!blocked || reason > S->reason[abs (lit)])
+          blocked = lit, reason = S->reason[abs (lit)]; }
+
+    if (blocked && reason) {
+      analyze (S, S->DB + reason, -1);
+      S->reason[abs (blocked)] = 0; }
+
+    if (!blocked) {
+      RATcls = S->DB + S->RATset[i];
+      while (*RATcls) {
+        int lit = *RATcls++;
+        if (lit != -pivot && !S->false[lit]) {
+          ASSIGN(-lit); S->reason[abs (lit)] = 0; } }
+      if (propagate (S, 0) == SAT) { flag  = 0; break; } }
+    addDependency (S, -id, 1); }
+
+  if (flag == 0) {
+    while (S->forced < S->assigned) S->false[*(--S->assigned)] = 0;
+    if (S->verb) printf ("c RAT check on pivot %i failed\n", pivot);
+    return FAILED; }
+
+  return SUCCEED; }
+
 int redundancyCheck (struct solver *S, int *clause, int size) {
   int i, indegree;
-  int falsePivot = S->false[ clause[PIVOT] ];
+  int falsePivot = S->false[clause[PIVOT]];
   if (S->verb) { printf ("c checking lemma (%i, %i) ", size, clause[PIVOT]); printClause (clause); }
 
   if (S->mode != FORWARD_UNSAT)
@@ -414,73 +475,30 @@ int redundancyCheck (struct solver *S, int *clause, int size) {
 
   if (falsePivot) return FAILED;
 
-  int j, nRAT = 0; // blocked, nRAT = 0;
-  long int reason;
   int* savedForced = S->forced;
 
   S->RATmode = 1;
   S->forced = S->assigned;
 
-  // Loop over all literals to calculate resolution candidates
-  for (i = -S->maxVar; i <= S->maxVar; i++) {
-    if (i == 0) continue;
-    // Loop over all watched clauses for literal
-    for (j = 0; j < S->used[i]; j++) {
-      int* watched = S->DB + (S->wlist[i][j] >> 1);
-      int id = watched[ID] >> 1;
-      int active = watched[ID] & ACTIVE;
-      if (*watched == i) { // If watched literal is in first position
-	while (*watched)
-          if (*watched++ == -reslit) {
-            if ((S->mode == BACKWARD_UNSAT) && !active) {
-              printf ("c RAT check ignores unmarked clause : "); printClause (S->DB + (S->wlist[i][j] >> 1));
-              continue; }
-	    if (nRAT == S->maxRAT) {
-	      S->maxRAT = (S->maxRAT * 3) >> 1;
-	      S->RATset = realloc (S->RATset, sizeof (int) * S->maxRAT); }
-	    S->RATset[nRAT++] = S->wlist[i][j] >> 1;
-            break; } } } }
-
-  // Check all clauses in RATset for RUP
-  int flag = 1;
-  qsort (S->RATset, nRAT, sizeof (int), compare);
-  for (i = nRAT - 1; i >= 0; i--) {
-    int* RATcls = S->DB + S->RATset[i];
-    int id = RATcls[ID] >> 1;
-    int blocked = 0;
-    int reason  = 0;
-    if (S->verb) {
-      printf ("c RAT clause: "); printClause (RATcls); }
-
-    while (*RATcls) {
-      int lit = *RATcls++;
-      if (lit != -reslit && S->false[-lit])
-        if (!blocked || reason > S->reason[abs (lit)])
-          blocked = lit, reason = S->reason[abs (lit)]; }
-
-    if (blocked && reason) {
-      analyze (S, S->DB + reason, -1);
-      S->reason[abs (blocked)] = 0; }
-
-    if (!blocked) {
-      RATcls = S->DB + S->RATset[i];
-      while (*RATcls) {
-        int lit = *RATcls++;
-        if (lit != -reslit && !S->false[lit]) {
-          ASSIGN(-lit); S->reason[abs (lit)] = 0; } }
-      if (propagate (S, 0) == SAT) { flag  = 0; break; } }
-    addDependency (S, -id, 1); }
-
-  if (flag == 0) {
-    if (S->verb) printf ("c RAT check failed\n");
-    return FAILED; }
+  if (checkRAT (S, reslit) == FAILED) {
+    int failed = 1;
+    if (S->warning != NOWARNING) {
+      printf ("c WARNING: RAT check on proof pivot failed : "); printClause (clause); }
+    if (S->warning == HARDWARNING) exit (HARDWARNING);
+    for (i = 0; i < size; i++) {
+      if (clause[i] == reslit) continue;
+      if (checkRAT (S, clause[i]) == SUCCEED) {
+        clause[PIVOT] = clause[i];
+        failed = 0; break; } }
+    if (failed) return FAILED; }
 
   printDependencies (S, clause, 1);
+
   S->processed = S->forced = savedForced;
   while (S->forced < S->assigned) S->false[*(--S->assigned)] = 0;
 
   S->RATcount++;
-  if (S->verb) printf ("c lemma has RAT on %i\n", reslit);
+  if (S->verb) printf ("c lemma has RAT on %i\n", clause[PIVOT]);
   return SUCCEED; }
 
 int verify (struct solver *S) {
@@ -603,7 +621,7 @@ int verify (struct solver *S) {
     S->time = clause[ID];
     if ((S->time & ACTIVE) == 0) continue;  // If not marked, continue
 
-    assert (size >=  1);
+    assert (size >= 1);
     int *_clause = clause + size;
     while (*_clause++) { S->delLit++; }
     clause[size] = 0;
