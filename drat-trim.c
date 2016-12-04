@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
 Copyright (c) 2015-2016 Marijn Heule, The University of Texas at Austin.
-Last edit, November 11, 2016
+Last edit, December 4, 2016
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -202,7 +202,7 @@ static inline int propagateUnits (struct solver* S, int init) {
 
 // Put falsified literals at the end and returns the size under the current
 // assignment: negative size means satisfied, size = 0 means falsified
-int sortSize (struct solver *S, int *lemma, int diff) {
+int sortSize (struct solver *S, int *lemma) {
   unsigned int size = 0, last = 0, sat = 1;
   while (lemma[last]) {
     int lit = lemma[last++];
@@ -564,7 +564,7 @@ int verify (struct solver *S) {
       if (S->mode == FORWARD_UNSAT)  continue;
       if (S->mode == BACKWARD_UNSAT) continue; }
 
-    int size = sortSize (S, lemmas, -2 * d + 1); // after removal of watches
+    int size = sortSize (S, lemmas); // after removal of watches
 
     if (d && S->mode == FORWARD_SAT) {
       if (size == -1) propagateUnits (S, 0);  // necessary?
@@ -573,7 +573,7 @@ int verify (struct solver *S) {
 
     if (d == 0 && S->mode == FORWARD_UNSAT) {
       if (redundancyCheck (S, lemmas, size) == FAILED) return SAT;
-      size = sortSize (S, lemmas, -2 * d + 1);
+      size = sortSize (S, lemmas);
       S->nDependencies = 0; }
 
     if (lemmas[1])
@@ -590,6 +590,16 @@ int verify (struct solver *S) {
     postprocess (S); return UNSAT; }
 
   if (S->mode == BACKWARD_UNSAT) {
+    if (S->backforce) {
+      int c;
+      for (c = S->nClauses; c <= checked; c++) {
+        long ad = S->adlist[c];
+        int *clause = S->DB + (ad >> INFOBITS);
+        if (sortSize(S, clause) >= 0) {
+          if ((ad & 1) && (clause[ID] & 1)) clause[ID] ^= ACTIVE;
+          if (!(ad & 1))                    clause[ID] |= ACTIVE; }
+      }
+    }
     if (!S->backforce) {
       printf ("\rc ERROR: no conflict\n");
       return SAT; } }
@@ -641,7 +651,7 @@ int verify (struct solver *S) {
           unassignUnit (S, clause[0]); } }
       else unassignUnit (S, clause[0]); }
 
-    int size = sortSize (S, clause, 2 * d - 1); // check the diff
+    int size = sortSize (S, clause);
 
     if (d) {
       if (S->verb) { printf ("\rc adding clause (%i) ", size); printClause (clause); }
