@@ -47,10 +47,10 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define NOWARNING	 60
 #define HARDWARNING	 70
 
-struct solver { FILE *inputFile, *proofFile, *coreFile, *lemmaFile, *lratFile, *traceFile;
+struct solver { FILE *inputFile, *proofFile, *coreFile, *lemmaFile, *lratFile, *traceFile, *activeFile;
     int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, MARKcount,
-      Lcount, maxRAT, *RATset, *preRAT, maxDependencies, nDependencies, bar,
+      Lcount, maxRAT, *RATset, *preRAT, maxDependencies, nDependencies, bar, backforce,
       *dependencies, maxVar, mode, verb, unitSize, prep, *current, delLit, warning;
     struct timeval start_time;
     long mem_used, time, nClauses, lastLemma, *unitStack, *reason, lemmas, arcs, *adlist, **wlist, *delinfo;  };
@@ -106,7 +106,7 @@ static inline void markWatch (struct solver* S, int* clause, int index, int offs
   long* watch = S->wlist[ clause[ index ] ];
   for (;;) {
     int *_clause = (S->DB + (*(watch++) >> 1) + (long) offset);
-    if (_clause == clause) { watch[-1] |= ACTIVE; return; } } }
+    if (_clause == clause) { watch[ID] |= ACTIVE; return; } } }
 
 static inline void addDependency (struct solver* S, int dep, int forced) {
   if (S->traceFile || S->lratFile) {
@@ -119,9 +119,9 @@ static inline void markClause (struct solver* S, int* clause, int index) {
   S->arcs++;
   addDependency (S, clause[index - 1] >> 1, (S->assigned > S->forced));
 
-  if ((clause[index - 1] & ACTIVE) == 0) {
+  if ((clause[index + ID] & ACTIVE) == 0) {
     S->MARKcount++;
-    clause[index - 1] |= ACTIVE;
+    clause[index + ID] |= ACTIVE;
     if ((S->lemmaFile || S->traceFile || S->lratFile) && clause[index + 1]) {
       *(S->delinfo++) = (((long) (clause - S->DB) + index) << 1) + 1; }
     if (clause[1 + index] == 0) return;
@@ -302,7 +302,20 @@ void printTrace (struct solver *S) {
         fprintf (S->traceFile, "0 0\n"); } }
     fclose (S->traceFile); } }
 
+void printActive (struct solver *S) {
+  int i, j;
+  if (S->activeFile) {
+    for (i = -S->maxVar; i <= S->maxVar; i++)
+      if (i != 0)
+        for (j = 0; j < S->used[i]; j++) {
+          int *clause = S->DB + (S->wlist[i][j] >> 1);
+          if (*clause == i) {
+            while (*clause)
+              fprintf (S->activeFile, "%i ", *clause++);
+            fprintf (S->activeFile, "0\n"); } } } }
+
 void postprocess (struct solver *S) {
+  printActive (S);
   printCore   (S);
   printProof  (S);   // closes lemmasFile
   printNoCore (S);   // closes lratFile
@@ -577,10 +590,12 @@ int verify (struct solver *S) {
     postprocess (S); return UNSAT; }
 
   if (S->mode == BACKWARD_UNSAT) {
-    printf ("\rc ERROR: no conflict\n");
-    return SAT; }
+    if (!S->backforce) {
+      printf ("\rc ERROR: no conflict\n");
+      return SAT; } }
 
   if (S->mode == FORWARD_UNSAT) {
+    postprocess (S);
     printf ("\rc ERROR: all lemmas verified, but no conflict\n");
     return SAT; }
 
@@ -632,6 +647,7 @@ int verify (struct solver *S) {
       if (S->verb) { printf ("\rc adding clause (%i) ", size); printClause (clause); }
       addWatch (S, clause, 0), addWatch (S, clause, 1); continue; }
 
+//    if (S->backforce) clause[ID] |= ACTIVE;
     S->time = clause[ID];
     if ((S->time & ACTIVE) == 0) continue;  // If not marked, continue
 
@@ -951,7 +967,8 @@ void printHelp ( ) {
   printf ("usage: drat-trim [INPUT] [<PROOF>] [<option> ...]\n\n");
   printf ("where <option> is one of the following\n\n");
   printf ("  -h          print this command line option summary\n");
-  printf ("  -c CORE     prints the unsatisfiable core to the file CORE\n");
+  printf ("  -c CORE     prints the unsatisfiable core to the file CORE (DIMACS format)\n");
+  printf ("  -a ACTIVE   prints the active clauses to the file ACTIVE (DIMACS format)\n");
   printf ("  -l LEMMAS   prints the core lemmas to the file LEMMAS (DRAT format)\n");
   printf ("  -L LEMMAS   prints the core lemmas to the file LEMMAS (LRAT format)\n");
   printf ("  -r TRACE    resolution graph in the TRACE file (TRACECHECK format)\n\n");
@@ -972,40 +989,44 @@ void printHelp ( ) {
 int main (int argc, char** argv) {
   struct solver S;
 
-  S.inputFile = NULL;
-  S.proofFile = stdin;
-  S.coreFile  = NULL;
-  S.lemmaFile = NULL;
-  S.lratFile  = NULL;
-  S.traceFile = NULL;
-  S.timeout   = TIMEOUT;
-  S.mask      = 0;
-  S.verb      = 0;
-  S.warning   = 0;
-  S.prep      = 0;
-  S.bar       = 0;
-  S.mode      = BACKWARD_UNSAT;
-  S.delete    = 1;
-  S.binMode   = 0;
+  S.inputFile  = NULL;
+  S.proofFile  = stdin;
+  S.coreFile   = NULL;
+  S.activeFile = NULL;
+  S.lemmaFile  = NULL;
+  S.lratFile   = NULL;
+  S.traceFile  = NULL;
+  S.timeout    = TIMEOUT;
+  S.mask       = 0;
+  S.verb       = 0;
+  S.backforce  = 0;
+  S.warning    = 0;
+  S.prep       = 0;
+  S.bar        = 0;
+  S.mode       = BACKWARD_UNSAT;
+  S.delete     = 1;
+  S.binMode    = 0;
   gettimeofday (&S.start_time, NULL);
 
   int i, tmp = 0;
   for (i = 1; i < argc; i++) {
     if        (argv[i][0] == '-') {
       if      (argv[i][1] == 'h') printHelp ();
-      else if (argv[i][1] == 'c') S.coreFile  = fopen (argv[++i], "w");
-      else if (argv[i][1] == 'l') S.lemmaFile = fopen (argv[++i], "w");
-      else if (argv[i][1] == 'L') S.lratFile  = fopen (argv[++i], "w");
-      else if (argv[i][1] == 'r') S.traceFile = fopen (argv[++i], "w");
-      else if (argv[i][1] == 't') S.timeout   = atoi (argv[++i]);
-      else if (argv[i][1] == 'b') S.bar       = 1;
-      else if (argv[i][1] == 'u') S.mask      = 1;
-      else if (argv[i][1] == 'v') S.verb      = 1;
-      else if (argv[i][1] == 'w') S.warning   = NOWARNING;
-      else if (argv[i][1] == 'W') S.warning   = HARDWARNING;
-      else if (argv[i][1] == 'p') S.delete    = 0;
-      else if (argv[i][1] == 'f') S.mode      = FORWARD_UNSAT;
-      else if (argv[i][1] == 'S') S.mode      = FORWARD_SAT; }
+      else if (argv[i][1] == 'c') S.coreFile   = fopen (argv[++i], "w");
+      else if (argv[i][1] == 'a') S.activeFile = fopen (argv[++i], "w");
+      else if (argv[i][1] == 'l') S.lemmaFile  = fopen (argv[++i], "w");
+      else if (argv[i][1] == 'L') S.lratFile   = fopen (argv[++i], "w");
+      else if (argv[i][1] == 'r') S.traceFile  = fopen (argv[++i], "w");
+      else if (argv[i][1] == 't') S.timeout    = atoi (argv[++i]);
+      else if (argv[i][1] == 'b') S.bar        = 1;
+      else if (argv[i][1] == 'B') S.backforce  = 1;
+      else if (argv[i][1] == 'u') S.mask       = 1;
+      else if (argv[i][1] == 'v') S.verb       = 1;
+      else if (argv[i][1] == 'w') S.warning    = NOWARNING;
+      else if (argv[i][1] == 'W') S.warning    = HARDWARNING;
+      else if (argv[i][1] == 'p') S.delete     = 0;
+      else if (argv[i][1] == 'f') S.mode       = FORWARD_UNSAT;
+      else if (argv[i][1] == 'S') S.mode       = FORWARD_SAT; }
     else {
       tmp++;
       if (tmp == 1) {
