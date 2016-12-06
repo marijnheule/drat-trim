@@ -592,7 +592,7 @@ int verify (struct solver *S) {
   if (S->mode == BACKWARD_UNSAT) {
     if (S->backforce) {
       int c;
-      for (c = S->nClauses; c <= checked; c++) {
+      for (c = S->nClauses; c < checked; c++) {
         long ad = S->adlist[c];
         int *clause = S->DB + (ad >> INFOBITS);
         if (sortSize(S, clause) >= 0) {
