@@ -56,11 +56,8 @@ struct solver { FILE *inputFile, *proofFile, *coreFile, *lemmaFile, *lratFile, *
     long mem_used, time, nClauses, nSteps, nOpt, nAlloc, *unitStack, *reason, lemmas, arcs,
          **wlist, *optproof, *formula, *proof;  };
 
-#define ASSUME(a)	{ S->false[-(a)] = ASSUMED; *(S->assigned++) = -(a); S->reason[abs (a)] = 0; }
-#define ASSIGN(a)	{ S->false[-(a)] = 1; *(S->assigned++) = -(a); }
-#define ADD_WATCH(l,m)  { if (S->used[(l)] + 1 == S->max[(l)]) { S->max[(l)] *= 1.5; \
-                            S->wlist[(l)] = (long *) realloc (S->wlist[(l)], sizeof (long) * S->max[(l)]); } \
-                          S->wlist[(l)][ S->used[(l)]++ ] = (m); S->wlist[(l)][ S->used[(l)] ] = END; }
+static inline void assign (struct solver* S, int lit) {
+  S->false[-lit] = 1; *(S->assigned++) = -lit; }
 
 int compare (const void *a, const void *b) {
   return (*(int*)a - *(int*)b); }
@@ -72,12 +69,14 @@ static inline void printClause (int* clause) {
   printf ("[%i] ", clause[ID]);
   while (*clause) printf ("%i ", *clause++); printf ("0\n"); }
 
-static inline void addWatch (struct solver* S, int* clause, int index) {
-  int lit = clause[ index ];
+static inline void addWatchPtr (struct solver* S, int lit, long watch) {
   if (S->used[lit] + 1 == S->max[lit]) { S->max[lit] *= 1.5;
     S->wlist[lit] = (long*) realloc (S->wlist[lit], sizeof (long) * S->max[lit]); }
-  S->wlist[lit][ S->used[lit]++ ] = ((long) (((clause) - S->DB)) << 1) + S->mask;
+  S->wlist[lit][ S->used[lit]++ ] = watch | S->mask;
   S->wlist[lit][ S->used[lit]   ] = END; }
+
+static inline void addWatch (struct solver* S, int* clause, int index) {
+  addWatchPtr (S, clause[index], ((long) (((clause) - S->DB)) << 1)); }
 
 static inline void removeWatch (struct solver* S, int* clause, int index) {
   int lit = clause[index]; long *watch = S->wlist[lit];
@@ -174,13 +173,13 @@ int propagate (struct solver* S, int init) {        // Performs unit propagation
       for (i = 2; clause[i]; ++i)                   // Scan the non-watched literals
         if (S->false[ clause[i] ] == 0) {           // When clause[j] is not false, it is either true or unset
           clause[1] = clause[i]; clause[i] = lit;   // Swap literals
-          ADD_WATCH (clause[1], *watch);            // Add the watch to the list of clause[1]
+          addWatchPtr (S, clause[1], *watch);       // Add the watch to the list of clause[1]
           *watch = S->wlist[lit][ --S->used[lit] ]; // Remove pointer
           S->wlist[lit][ S->used[lit] ] = END;
           goto next_clause; }                       // Goto the next watched clause
       clause[1] = lit; watch++;                     // Set lit at clause[1] and set next watch
       if (!S->false[  clause[0] ]) {                // If the other watched literal is falsified,
-        ASSIGN (clause[0]);                         // A unit clause is found, and the reason is set
+        assign (S, clause[0]);                      // A unit clause is found, and the reason is set
         S->reason[abs (clause[0])] = ((long) ((clause)-S->DB)) + 1;
         if (!check) {
           start[0]--; _lit = lit; _watch = watch;
@@ -198,7 +197,7 @@ static inline int propagateUnits (struct solver* S, int init) {
   for (i = 0; i < S->unitSize; i++) {
     int lit = S->DB[ S->unitStack[i] ];
     S->reason[abs (lit)] = S->unitStack[i] + 1;
-    ASSIGN (lit); }
+    assign (S, lit); }
 
   if (propagate (S, init) == UNSAT) { return UNSAT; }
   S->forced = S->processed;
@@ -448,7 +447,7 @@ int checkRAT (struct solver *S, int pivot) {
       while (*RATcls) {
         int lit = *RATcls++;
         if (lit != -pivot && !S->false[lit]) {
-          ASSIGN(-lit); S->reason[abs (lit)] = 0; } }
+          assign (S, -lit); S->reason[abs (lit)] = 0; } }
       if (propagate (S, 0) == SAT) { flag  = 0; break; } }
     addDependency (S, -id, 1); }
 
@@ -481,7 +480,9 @@ int redundancyCheck (struct solver *S, int *clause, int size) {
       if (S->warning == HARDWARNING) exit (HARDWARNING);
       while (S->forced < S->assigned) S->false[*(--S->assigned)] = 0;
       return SUCCEED; }
-    ASSUME(-clause[i]); }
+    S->false[clause[i]] = ASSUMED;
+    *(S->assigned++) = clause[i];
+    S->reason[abs (clause[i])] = 0; }
 
   S->current = clause;
   if (propagate (S, 0) == UNSAT) {
@@ -568,7 +569,6 @@ int verify (struct solver *S) {
           removeWatch (S, lemmas, 0), removeWatch (S, lemmas, 1);
           propagateUnits (S, 0); } }
       else {
-//        printf("\rc removing clause : "); printClause (lemmas);
         removeWatch (S, lemmas, 0), removeWatch (S, lemmas, 1); }
       if (S->mode == FORWARD_UNSAT)  continue;
       if (S->mode == BACKWARD_UNSAT) continue; }
@@ -591,7 +591,7 @@ int verify (struct solver *S) {
     if (size == 0) { printf ("\rc conflict claimed, but not detected\n"); return SAT; }  // change to FAILED?
     if (size == 1) {
       if (S->verb) printf ("\rc found unit %i\n", lemmas[0]);
-      ASSIGN (lemmas[0]); S->reason[abs (lemmas[0])] = ((long) ((lemmas)-S->DB)) + 1;
+      assign (S, lemmas[0]); S->reason[abs (lemmas[0])] = ((long) ((lemmas)-S->DB)) + 1;
       if (propagate (S, 1) == UNSAT) goto start_verification;
       S->forced = S->processed; } }
 
@@ -662,7 +662,6 @@ int verify (struct solver *S) {
       if (S->verb) { printf ("\rc adding clause (%i) ", size); printClause (clause); }
       addWatch (S, clause, 0), addWatch (S, clause, 1); continue; }
 
-//    if (S->backforce) clause[ID] |= ACTIVE;
     S->time = clause[ID];
     if ((S->time & ACTIVE) == 0) continue;  // If not marked, continue
 
@@ -972,7 +971,7 @@ int parse (struct solver* S) {
       return UNSAT; }
     else if (!S->false[ -clause[0] ]) {
       addUnit (S, (long) (clause - S->DB));
-      ASSIGN (clause[0]); }
+      assign (S, clause[0]); }
   }
   return retvalue; }
 
