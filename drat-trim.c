@@ -944,10 +944,10 @@ int parse (struct solver* S) {
   for (i = 1; i <= n; ++i) { S->wlist[ i] = (long*) malloc (sizeof (long) * S->max[ i]); S->wlist[ i][0] = END;
                              S->wlist[-i] = (long*) malloc (sizeof (long) * S->max[-i]); S->wlist[-i][0] = END; }
 
-  S->unitSize  = 0;
   S->unitStack = (long *) malloc (sizeof (long) * n);
 
   // initialize watch pointers on the original clauses
+  S->unitSize = 0;
   for (i = 0; i < S->nClauses; i++) {
     int *clause = S->DB + (S->formula[i] >> INFOBITS);
     if (clause[0] == 0) {
@@ -960,7 +960,7 @@ int parse (struct solver* S) {
         fclose (S->lemmaFile); }
       return UNSAT; }
     if (clause[1]) { addWatch (S, clause, 0); addWatch (S, clause, 1); }
-    else if (S->false[  clause[0] ]) {
+    else if (S->false[clause[0]]) {
       printf ("\rc found complementary unit clauses\n");
       if (S->coreFile) {
         fprintf (S->coreFile, "p cnf %i 2\n%i 0\n%i 0\n", abs (clause[0]), clause[0], -clause[0]);
