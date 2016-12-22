@@ -705,17 +705,30 @@ int verify (struct solver *S, int begin, int end) {
 
   S->nOpt = 0;
 
+  int checked = 0, skipped = 0;
+
   double max = (double) step;
+
+  struct timeval backward_time;
+  gettimeofday (&backward_time, NULL);
   for (; step >= 0; step--) {
+    struct timeval current_time;
+    gettimeofday (&current_time, NULL);
+    int seconds = (int) (current_time.tv_sec - S->start_time.tv_sec);
+    if (seconds > S->timeout) printf ("s TIMEOUT\n"), exit (0);
+
     if (S->bar)
       if ((step % 1000) == 0) {
         int f;
+        long runtime = (current_time.tv_sec  - backward_time.tv_sec ) * 1000000 +
+                       (current_time.tv_usec - backward_time.tv_usec);
+        double time = (double) (runtime / 1000000.0);
         double fraction = (step * 1.0) / max;
         printf("\rc %.2f%% [", 100.0 * (1.0 - fraction));
         for (f = 1; f <= 20; f++) {
           if ((1.0 - fraction) * 20.0 < 1.0 * f) printf(" ");
           else printf("="); }
-        printf("]");
+        printf("] time remaining: %.2f seconds", time / (1.0 - fraction) - time);
         if (step == 0) printf("\n");
         fflush (stdout); }
 
@@ -740,7 +753,10 @@ int verify (struct solver *S, int begin, int end) {
       addWatch (S, clause, 0), addWatch (S, clause, 1); continue; }
 
     S->time = clause[ID];
-    if ((S->time & ACTIVE) == 0) continue;  // If not marked, continue
+    if ((S->time & ACTIVE) == 0) {
+      skipped++;
+//      if ((skipped % 100) == 0) printf("c skipped %i, checked %i\n", skipped, checked);
+      continue; } // If not marked, continue
 
     assert (size >= 1);
     int *_clause = clause + size;
@@ -750,12 +766,8 @@ int verify (struct solver *S, int begin, int end) {
     if (S->verb) {
       printf ("\rc validating clause (%i, %i):  ", clause[PIVOT], size); printClause (clause); }
 
-    struct timeval current_time;
-    gettimeofday (&current_time, NULL);
-    int seconds = (int) (current_time.tv_sec - S->start_time.tv_sec);
-    if (seconds > S->timeout) printf ("s TIMEOUT\n"), exit (0);
-
     if (redundancyCheck (S, clause, size) == FAILED) return SAT;
+    checked++;
     S->optproof[S->nOpt++] = ad; }
 
   postprocess (S);
@@ -792,8 +804,21 @@ int read_lit (FILE *proofFile, int *lit) {
   else       *lit = (l >> 1);
   return 1; }
 
-int shuffleProof (struct solver *S) {
-  int step;
+int shuffleProof (struct solver *S, int iteration) {
+  int i, step, _step;
+
+  double base = 500;
+  for (i = 1; i < iteration; i++)
+    base *= 1.1;
+
+  for (_step = 0, step = 0; step < S->nStep; step++) {
+    if (S->proof[step] & 1) {
+      int length = 0;
+      int *clause = S->DB + (S->proof[step] >> INFOBITS);
+      while (*clause) { length++; clause++; }
+      if ((rand() % 1000) < (base * iteration / length)) continue; }
+    S->proof[_step++] = S->proof[step]; }
+  S->nStep = _step;
 
   for (step = 0; step < S->nStep; step++) {
     long ad = S->proof[step];
@@ -1200,8 +1225,10 @@ int main (int argc, char** argv) {
   goto start;
 */
   if (S.optimize) {
+    int iteration = 1;
     while (S.nRemoved) {
-      shuffleProof (&S);
+      shuffleProof (&S, iteration);
+      iteration++;
       verify (&S, 0, 0); } }
 
   freeMemory (&S);
