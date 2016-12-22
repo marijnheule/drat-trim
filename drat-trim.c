@@ -31,7 +31,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define UNSAT       0
 #define SAT         1
 #define EXTRA       3
-#define INFOBITS    2
+#define INFOBITS    2		// could be 1 for SAT, must be 2 for QBF
 #define ASSUMED     2
 #define MARK        3
 #define ERROR      -1
@@ -47,13 +47,14 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define NOWARNING	 60
 #define HARDWARNING	 70
 
-struct solver { FILE *inputFile, *proofFile, *coreFile, *lemmaFile, *lratFile, *traceFile, *activeFile;
-    int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode,
+struct solver { FILE *inputFile, *proofFile, *lratFile, *traceFile, *activeFile;
+    int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode, optimize,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, nActive,
       nLemmas, maxRAT, *RATset, *preRAT, maxDependencies, nDependencies, bar, backforce,
       *dependencies, maxVar, maxSize, mode, verb, unitSize, prep, *current, nRemoved, warning;
+    char *coreStr, *lemmaStr;
     struct timeval start_time;
-    long mem_used, time, nClauses, nSteps, nOpt, nAlloc, *unitStack, *reason, lemmas, nResolve,
+    long mem_used, time, nClauses, nStep, nOpt, nAlloc, *unitStack, *reason, lemmas, nResolve,
          **wlist, *optproof, *formula, *proof;  };
 
 static inline void assign (struct solver* S, int lit) {
@@ -80,7 +81,9 @@ static inline void addWatch (struct solver* S, int* clause, int index) {
 
 static inline void removeWatch (struct solver* S, int* clause, int index) {
   int lit = clause[index]; long *watch = S->wlist[lit];
-  for (;;) {
+  int i;
+//  for (;;) {
+  for (i = 0; i < S->used[lit]; i++) {
     int* _clause = S->DB + (*(watch++) >> 1);
     if (_clause == clause) {
       watch[-1] = S->wlist[lit][ --S->used[lit] ];
@@ -222,19 +225,20 @@ void printCore (struct solver *S) {
     if (clause[ID] & ACTIVE) S->COREcount++; }
   printf ("\rc %i of %li clauses in core\n", S->COREcount, S->nClauses);
 
-  if (S->coreFile) {
-    fprintf (S->coreFile, "p cnf %i %i\n", S->nVars, S->COREcount);
+  if (S->coreStr) {
+    FILE *coreFile = fopen (S->coreStr, "w");
+    fprintf (coreFile, "p cnf %i %i\n", S->nVars, S->COREcount);
     for (i = 0; i < S->nClauses; i++) {
       int *clause = S->DB + (S->formula[i] >> INFOBITS);
       if (clause[ID] & ACTIVE) {
-        while (*clause) fprintf (S->coreFile, "%i ", *clause++);
-        fprintf (S->coreFile, "0\n"); } }
-    fclose (S->coreFile); } }
+        while (*clause) fprintf (coreFile, "%i ", *clause++);
+        fprintf (coreFile, "0\n"); } }
+    fclose (coreFile); } }
 
 // print the core lemmas to lemmaFile in DRAT format
 void printProof (struct solver *S) {
   int step;
-  printf ("\rc %i of %i lemmas in core using %lu resolution steps\n", S->nActive - S->COREcount + 1, S->nLemmas, S->nResolve);
+  printf ("\rc %i of %i lemmas in core using %lu resolution steps\n", S->nActive - S->COREcount + 1, S->nLemmas + 1, S->nResolve);
   printf ("\rc %d RAT lemmas in core; %i redundant literals in core lemmas\n", S->RATcount, S->nRemoved);
 
   // NB: not yet working with forward checking
@@ -247,7 +251,7 @@ void printProof (struct solver *S) {
     if (S->nOpt > S->nAlloc) {
       S->nAlloc = S->nOpt;
       S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc); }
-    S->nSteps  = 0;
+    S->nStep   = 0;
     S->nLemmas = 0;
     for (step = S->nOpt - 1; step >= 0; step--) {
       long ad = S->optproof[step];
@@ -255,44 +259,45 @@ void printProof (struct solver *S) {
       if ((ad & 1) == 0) S->nLemmas++;
       if (lemmas[ID] & ACTIVE)
         lemmas[ID] ^= ACTIVE;
-      S->proof[S->nSteps++] = S->optproof[step]; } }
+      S->proof[S->nStep++] = S->optproof[step]; } }
 
-  if (S->lemmaFile) {
-    for (step = 0; step < S->nSteps; step++) {
+  if (S->lemmaStr) {
+    FILE *lemmaFile = fopen (S->lemmaStr, "w");
+    for (step = 0; step < S->nStep; step++) {
       long ad = S->proof[step];
       int *lemmas = S->DB + (ad >> INFOBITS);
       if (!lemmas[1] && (ad & 1)) continue; // don't delete unit clauses
-      if (ad & 1) fprintf (S->lemmaFile, "d ");
+      if (ad & 1) fprintf (lemmaFile, "d ");
       int reslit = lemmas[PIVOT];
       while (*lemmas) {
         int lit = *lemmas++;
         if (lit == reslit)
-        fprintf (S->lemmaFile, "%i ", lit); }
+        fprintf (lemmaFile, "%i ", lit); }
       lemmas = S->DB + (ad >> INFOBITS);
       while (*lemmas) {
         int lit = *lemmas++;
         if (lit != reslit)
-          fprintf (S->lemmaFile, "%i ", lit); }
-      fprintf (S->lemmaFile, "0\n"); }
-    fprintf (S->lemmaFile, "0\n");
-    fclose (S->lemmaFile); }
+          fprintf (lemmaFile, "%i ", lit); }
+      fprintf (lemmaFile, "0\n"); }
+    fprintf (lemmaFile, "0\n");
+    fclose (lemmaFile); }
 
   if (S->lratFile) {
-    int index = S->nClauses;
-    for (step = 0; step < S->nSteps; step++) {
+    int lastAdded = S->nClauses;
+    int flag = 0;
+    for (step = 0; step < S->nStep; step++) {
       long ad = S->proof[step];
       int *lemmas = S->DB + (ad >> INFOBITS);
       if ((ad & 1) == 0) {
-        if (index == 0) fprintf (S->lratFile, "0\n");
-        index = lemmas[ID] >> 1;
-        continue; }
-      if (!lemmas[1] && (ad & 1)) continue; // don't delete unit clauses
-      if (ad & 1) {
-        if (index != 0)
-          fprintf (S->lratFile, "%i d ", index);
-        fprintf (S->lratFile, "%i ", lemmas[ID] >> 1);
-        index = 0; } }
-      fprintf(S->lratFile, "0\n"); } }
+        if (lastAdded == 0) fprintf (S->lratFile, "0\n");
+        lastAdded = lemmas[ID] >> 1; }
+      else if (!lemmas[1] && (ad & 1)) continue; // don't delete unit clauses
+      else if (ad & 1) {
+        if (lastAdded != 0) fprintf (S->lratFile, "%i d ", lastAdded);
+        lastAdded = 0;
+        fprintf (S->lratFile, "%i ", lemmas[ID] >> 1); } }
+    fprintf(S->lratFile, "0\n");
+    fclose (S->lratFile); } }
 
 void printNoCore (struct solver *S) {
   if (S->lratFile) { int i;
@@ -301,8 +306,7 @@ void printNoCore (struct solver *S) {
       int *clause = S->DB + (S->formula[i] >> INFOBITS);
       if ((clause[ID] & ACTIVE) == 0)
         fprintf (S->lratFile, "%i ", clause[ID] >> 1); }
-    fprintf (S->lratFile, "0\n");
-    fclose (S->lratFile); } }
+    fprintf (S->lratFile, "0\n"); } }
 
 // print the dependency graph to traceFile in TraceCheck+ format
 // this procedure adds the active clauses at the end of the trace
@@ -329,10 +333,10 @@ void printActive (struct solver *S) {
             fprintf (S->activeFile, "0\n"); } } } }
 
 void postprocess (struct solver *S) {
+  printNoCore (S);
   printActive (S);
   printCore   (S);
-  printProof  (S);   // closes lemmasFile
-  printNoCore (S);   // closes lratFile
+  printProof  (S);   // closes lratFile
   printTrace  (S); } // closes traceFile
 
 void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode) {
@@ -563,22 +567,26 @@ int init (struct solver *S) {
     if (clause[ID] & ACTIVE) clause[ID] ^= ACTIVE;
     if (clause[0] == 0) {
       printf ("\rc formula contains empty clause\n");
-      if (S->coreFile) {
-        fprintf (S->coreFile, "p cnf 0 1\n 0\n");
-        fclose (S->coreFile); }
-      if (S->lemmaFile) {
-        fprintf (S->lemmaFile, "0\n");
-        fclose (S->lemmaFile); }
+      if (S->coreStr) {
+        FILE *coreFile = fopen (S->coreStr, "w");
+        fprintf (coreFile, "p cnf 0 1\n 0\n");
+        fclose (coreFile); }
+      if (S->lemmaStr) {
+        FILE *lemmaFile = fopen (S->lemmaStr, "w");
+        fprintf (lemmaFile, "0\n");
+        fclose (lemmaFile); }
       return UNSAT; }
     if (clause[1]) { addWatch (S, clause, 0); addWatch (S, clause, 1); }
     else if (S->false[clause[0]]) {
       printf ("\rc found complementary unit clauses\n");
-      if (S->coreFile) {
-        fprintf (S->coreFile, "p cnf %i 2\n%i 0\n%i 0\n", abs (clause[0]), clause[0], -clause[0]);
-        fclose (S->coreFile); }
-      if (S->lemmaFile) {
-        fprintf (S->lemmaFile, "0\n");
-        fclose (S->lemmaFile); }
+      if (S->coreStr) {
+        FILE *coreFile = fopen (S->coreStr, "w");
+        fprintf (coreFile, "p cnf %i 2\n%i 0\n%i 0\n", abs (clause[0]), clause[0], -clause[0]);
+        fclose (coreFile); }
+      if (S->lemmaStr) {
+        FILE *lemmaFile = fopen (S->lemmaStr, "w");
+        fprintf (lemmaFile, "0\n");
+        fclose (lemmaFile); }
       return UNSAT; }
     else if (!S->false[ -clause[0] ]) {
       addUnit (S, (long) (clause - S->DB));
@@ -592,13 +600,16 @@ int init (struct solver *S) {
     postprocess (S); return UNSAT; }
   return SAT; }
 
-int verify (struct solver *S) {
+int verify (struct solver *S, int begin, int end) {
   if (init (S) == UNSAT) return UNSAT;
 
-  if (S->mode == FORWARD_UNSAT) printf ("\rc start forward verification\n");
+  if (S->mode == FORWARD_UNSAT) {
+    if (begin == end)
+      printf ("\rc start forward verification\n"); }
   int step;
   int active = S->nClauses;
-  for (step = 0; step < S->nSteps; step++) {
+  for (step = 0; step < S->nStep; step++) {
+    if (step >= begin && step < end) continue;
     long ad = S->proof[step]; long d = ad & 1;
     int *lemmas = S->DB + (ad >> INFOBITS);
 
@@ -611,9 +622,10 @@ int verify (struct solver *S) {
       if (S->verb)
         printf ("\rc found unit in proof %i [%li]\n", lit, S->time);
       if (d) {
-        if (S->mode == FORWARD_SAT) { // also for FORWARD_UNSAT ?
+        if (S->mode != BACKWARD_UNSAT) {
           removeUnit (S, lit); propagateUnits (S, 0); }
         else { // no need to remove units while checking UNSAT
+          if (S->verb) { printf("c removing proof step: d "); printClause(lemmas); }
           S->proof[step] = 0; continue; } }
       else {
         if (S->mode == BACKWARD_UNSAT && S->false[-lit]) { S->proof[step] = 0; continue; }
@@ -639,9 +651,10 @@ int verify (struct solver *S) {
       continue; }
 
     if (d == 0 && S->mode == FORWARD_UNSAT) {
+      if (step > end) {
       if (redundancyCheck (S, lemmas, size) == FAILED) return SAT;
       size = sortSize (S, lemmas);
-      S->nDependencies = 0; }
+      S->nDependencies = 0; } }
 
     if (lemmas[1])
       addWatch (S, lemmas, 0), addWatch (S, lemmas, 1);
@@ -656,6 +669,12 @@ int verify (struct solver *S) {
   if (S->mode == FORWARD_SAT && active == 0) {
     postprocess (S); return UNSAT; }
 
+  if (S->mode == FORWARD_UNSAT) {
+      if (begin == end) {
+      postprocess (S);
+      printf ("\rc ERROR: all lemmas verified, but no conflict\n"); }
+    return SAT; }
+
   if (S->mode == BACKWARD_UNSAT) {
     if (S->backforce) {
       int s;
@@ -668,11 +687,6 @@ int verify (struct solver *S) {
     if (!S->backforce) {
       printf ("\rc ERROR: no conflict\n");
       return SAT; } }
-
-  if (S->mode == FORWARD_UNSAT) {
-    postprocess (S);
-    printf ("\rc ERROR: all lemmas verified, but no conflict\n");
-    return SAT; }
 
   start_verification:;
   if (S->mode == FORWARD_UNSAT) {
@@ -688,6 +702,8 @@ int verify (struct solver *S) {
 
   S->forced = S->processed;
   assert (S->mode == BACKWARD_UNSAT); // only reachable in BACKWARD_UNSAT mode
+
+  S->nOpt = 0;
 
   double max = (double) step;
   for (; step >= 0; step--) {
@@ -705,6 +721,9 @@ int verify (struct solver *S) {
 
     long ad = S->proof[step]; long d = ad & 1;
     int *clause = S->DB + (ad >> INFOBITS);
+
+//    printf("c backward step "); if (ad & 1) printf("d ");
+//    printClause (clause);
 
     if (ad == 0) continue; // Skip lemma that has been removed from proof
     if ( d == 0) {
@@ -773,6 +792,20 @@ int read_lit (FILE *proofFile, int *lit) {
   else       *lit = (l >> 1);
   return 1; }
 
+int shuffleProof (struct solver *S) {
+  int step;
+
+  for (step = 0; step < S->nStep; step++) {
+    long ad = S->proof[step];
+    if (ad & 1) continue;
+    int *clause = S->DB + (ad >> INFOBITS);
+    int i, length = 0;
+    while (*clause) { length++; clause++; }
+    clause = S->DB + (ad >> INFOBITS);
+    for (i = 0; i < length - 1; i++) {
+      int j = i + rand() / (RAND_MAX / (length - i) + 1);
+      int t = clause[i]; clause[i] = clause[j]; clause[j] = t; } } }
+
 int parse (struct solver* S) {
   int tmp, active = 0, retvalue = SAT;
   int del = 0;
@@ -794,7 +827,7 @@ int parse (struct solver* S) {
   if ((buffer = (int*) malloc (bsize * sizeof (int))) == NULL) return ERROR;
 
   S->count    = 1;
-  S->nSteps   = 0;
+  S->nStep    = 0;
   S->mem_used = 0;                  // The number of integers allocated in the DB
 
   long size;
@@ -901,9 +934,9 @@ int parse (struct solver* S) {
             if (S->mode == FORWARD_SAT) S->DB[ match - 2 ] = rem;
             hashUsed[hash]--;
             active--;
-            if (S->nSteps == S->nAlloc) { S->nAlloc = (S->nAlloc * 3) >> 1;
+            if (S->nStep == S->nAlloc) { S->nAlloc = (S->nAlloc * 3) >> 1;
               S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc); }
-            S->proof[S->nSteps++] = (match << INFOBITS) + 1; }
+            S->proof[S->nStep++] = (match << INFOBITS) + 1; }
         end_delete:;
         if (del) { del = 0; size = 0; continue; } }
 
@@ -926,9 +959,9 @@ int parse (struct solver* S) {
       if (nZeros > 0) { // if still parsing the formula
         S->formula[S->nClauses - nZeros] = (((long) (clause - S->DB)) << INFOBITS); }
       else {
-        if (S->nSteps == S->nAlloc) { S->nAlloc = (S->nAlloc * 3) >> 1;
+        if (S->nStep == S->nAlloc) { S->nAlloc = (S->nAlloc * 3) >> 1;
           S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc); }
-        S->proof[S->nSteps++] = (((long) (clause - S->DB)) << INFOBITS); }
+        S->proof[S->nStep++] = (((long) (clause - S->DB)) << INFOBITS); }
 
       if (nZeros <= 0) S->nLemmas++;
 
@@ -946,9 +979,9 @@ int parse (struct solver* S) {
         printf ("\rc ");
         int *clause = S->DB + hashTable [i][j];
         printClause (clause);
-        if (S->nSteps == S->nAlloc) { S->nAlloc = (S->nAlloc * 3) >> 1;
+        if (S->nStep == S->nAlloc) { S->nAlloc = (S->nAlloc * 3) >> 1;
             S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc); }
-        S->proof[S->nSteps++] = (((int) (clause - S->DB)) << INFOBITS) + 1; } } }
+        S->proof[S->nStep++] = (((int) (clause - S->DB)) << INFOBITS) + 1; } } }
 
   S->DB = (int *) realloc (S->DB, S->mem_used * sizeof (int));
 
@@ -1004,6 +1037,31 @@ void freeMemory (struct solver *S) {
   free (S->dependencies);
   return; }
 
+void removeSteps (struct solver*S, int begin, int end) {
+  int step, _step;
+
+  _step = 0;
+  for (step = 0; step < S->nStep; step++) {
+    long ad = S->proof[step];
+    int *clause = S->DB + (ad >> INFOBITS);
+    if (step < begin || step >= end) {
+      if (clause[ID] & ACTIVE) clause[ID] ^= ACTIVE;
+      S->proof[_step++] = S->proof[step]; }
+    else {
+//      printf("c remove proof step "); if (ad & 1) printf("d "); printClause (clause);
+    } }
+
+  S->nStep = _step;
+  S->mode = BACKWARD_UNSAT;
+  verify (S, 0, 0);
+  S->mode = FORWARD_UNSAT; }
+
+int onlyDelete (struct solver* S, int begin, int end) {
+  int step;
+  for (step = begin; step < end; step++)
+    if ((S->proof[step] & 1) == 0) return 0;
+  return 1; }
+
 void printHelp ( ) {
   printf ("usage: drat-trim [INPUT] [<PROOF>] [<option> ...]\n\n");
   printf ("where <option> is one of the following\n\n");
@@ -1018,6 +1076,7 @@ void printHelp ( ) {
   printf ("  -f          forward mode for UNSAT\n");
   printf ("  -v          more verbose output\n");
   printf ("  -b          show progress bar\n");
+  printf ("  -O          optimize proof till fixpoint by repeating verification\n");
   printf ("  -w          suppress warning messages\n");
   printf ("  -W          exit after first warning\n");
   printf ("  -p          run in plain mode (i.e., ignore deletion information)\n\n");
@@ -1032,15 +1091,16 @@ int main (int argc, char** argv) {
 
   S.inputFile  = NULL;
   S.proofFile  = stdin;
-  S.coreFile   = NULL;
+  S.coreStr    = NULL;
   S.activeFile = NULL;
-  S.lemmaFile  = NULL;
+  S.lemmaStr   = NULL;
   S.lratFile   = NULL;
   S.traceFile  = NULL;
   S.timeout    = TIMEOUT;
   S.mask       = 0;
   S.verb       = 0;
   S.backforce  = 0;
+  S.optimize   = 0;
   S.warning    = 0;
   S.prep       = 0;
   S.bar        = 0;
@@ -1053,14 +1113,15 @@ int main (int argc, char** argv) {
   for (i = 1; i < argc; i++) {
     if        (argv[i][0] == '-') {
       if      (argv[i][1] == 'h') printHelp ();
-      else if (argv[i][1] == 'c') S.coreFile   = fopen (argv[++i], "w");
+      else if (argv[i][1] == 'c') S.coreStr    = argv[++i];
       else if (argv[i][1] == 'a') S.activeFile = fopen (argv[++i], "w");
-      else if (argv[i][1] == 'l') S.lemmaFile  = fopen (argv[++i], "w");
+      else if (argv[i][1] == 'l') S.lemmaStr   = argv[++i];
       else if (argv[i][1] == 'L') S.lratFile   = fopen (argv[++i], "w");
       else if (argv[i][1] == 'r') S.traceFile  = fopen (argv[++i], "w");
       else if (argv[i][1] == 't') S.timeout    = atoi (argv[++i]);
       else if (argv[i][1] == 'b') S.bar        = 1;
       else if (argv[i][1] == 'B') S.backforce  = 1;
+      else if (argv[i][1] == 'O') S.optimize   = 1;
       else if (argv[i][1] == 'u') S.mask       = 1;
       else if (argv[i][1] == 'v') S.verb       = 1;
       else if (argv[i][1] == 'w') S.warning    = NOWARNING;
@@ -1100,17 +1161,48 @@ int main (int argc, char** argv) {
   fclose (S.inputFile);
   fclose (S.proofFile);
   int sts = ERROR;
-  if       (parseReturnValue == ERROR)    printf ("\rs MEMORY ALLOCATION ERROR\n");
-  else if  (parseReturnValue == UNSAT)    printf ("\rc trivial UNSAT\ns VERIFIED\n");
-  else if  ((sts = verify (&S)) == UNSAT) printf ("\rs VERIFIED\n");
+  if       (parseReturnValue == ERROR)          printf ("\rs MEMORY ALLOCATION ERROR\n");
+  else if  (parseReturnValue == UNSAT)          printf ("\rc trivial UNSAT\ns VERIFIED\n");
+  else if  ((sts = verify (&S, -1, -1)) == UNSAT) printf ("\rs VERIFIED\n");
   else printf ("\rs NOT VERIFIED\n")  ;
   struct timeval current_time;
   gettimeofday (&current_time, NULL);
   long runtime = (current_time.tv_sec  - S.start_time.tv_sec) * 1000000 +
                  (current_time.tv_usec - S.start_time.tv_usec);
   printf ("\rc verification time: %.3f seconds\n", (double) (runtime / 1000000.0));
+/*
+  start:;
 
-//  while (S.nRemoved) verify (&S);
+  S.mode = FORWARD_UNSAT;
+
+  for (i = 2; i < 2 * S.nStep; i *=2) {
+    int j;
+    int size = S.nStep / i;
+    if (size * i < S.nStep) size++;
+    for (j = 1; j * size < S.nStep; j++) {
+      if (onlyDelete (&S, (j-1) * size, j * size)) continue;
+      printf ("c interval [%i,%i> (%i)\n", (j-1) * size, j * size, S.nStep);
+      int res = verify (&S, (j-1) * size, j * size);
+      if (res == UNSAT) {
+        removeSteps (&S, (j-1) * size, j * size);
+        j = 0;
+      }
+    }
+    if (onlyDelete (&S, (j-1) * size, j * size) == 0) {
+      printf ("c interval [%i,%i>\n", (j-1) * size, S.nStep);
+      int res = verify (&S, (j-1) * size, S.nStep);
+      if (res == UNSAT) removeSteps (&S, (j-1) * size, S.nStep); }
+  }
+
+  S.mode= BACKWARD_UNSAT;
+  verify (&S, 0, 0);
+  verify (&S, 0, 0);
+  goto start;
+*/
+  if (S.optimize) {
+    while (S.nRemoved) {
+      shuffleProof (&S);
+      verify (&S, 0, 0); } }
 
   freeMemory (&S);
   return (sts != UNSAT); // 0 on success, 1 on any failure
