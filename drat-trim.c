@@ -336,8 +336,8 @@ void postprocess (struct solver *S) {
   printNoCore (S);
   printActive (S);
   printCore   (S);
-  printProof  (S);   // closes lratFile
-  printTrace  (S); } // closes traceFile
+  printTrace  (S);   // closes traceFile
+  printProof  (S); } // closes lratFile
 
 void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode) {
   FILE *file = NULL;
