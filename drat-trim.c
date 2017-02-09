@@ -647,12 +647,16 @@ int verify (struct solver *S, int begin, int end) {
 
     if (d && S->mode == FORWARD_SAT) {
       if (size == -1) propagateUnits (S, 0);  // necessary?
-      if (redundancyCheck (S, lemmas, size) == FAILED) return SAT;
+      if (redundancyCheck (S, lemmas, size) == FAILED)  {
+        printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
+        return SAT; }
       continue; }
 
     if (d == 0 && S->mode == FORWARD_UNSAT) {
       if (step > end) {
-      if (redundancyCheck (S, lemmas, size) == FAILED) return SAT;
+      if (redundancyCheck (S, lemmas, size) == FAILED) {
+        printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
+        return SAT; }
       size = sortSize (S, lemmas);
       S->nDependencies = 0; } }
 
@@ -766,7 +770,9 @@ int verify (struct solver *S, int begin, int end) {
     if (S->verb) {
       printf ("\rc validating clause (%i, %i):  ", clause[PIVOT], size); printClause (clause); }
 
-    if (redundancyCheck (S, clause, size) == FAILED) return SAT;
+    if (redundancyCheck (S, clause, size) == FAILED) {
+      printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
+      return SAT; }
     checked++;
     S->optproof[S->nOpt++] = ad; }
 
