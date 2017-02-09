@@ -833,7 +833,7 @@ int shuffleProof (struct solver *S, int iteration) {
 
 int parse (struct solver* S) {
   int tmp, active = 0, retvalue = SAT;
-  int del = 0;
+  int del = 0, proofLine = 0;
   int *buffer, bsize;
 
   S->nVars    = 0;
@@ -924,6 +924,7 @@ int parse (struct solver* S) {
     if (abs (lit) > S->nVars && !fileSwitchFlag) {
       printf ("\rc illegal literal %i due to max var %i\n", lit, S->nVars); exit (0); }
     if (!lit) {
+      if (fileSwitchFlag) proofLine++;
       if (size > S->maxSize) S->maxSize = size;
       int pivot = buffer[0];
       buffer[size] = 0;
@@ -953,7 +954,7 @@ int parse (struct solver* S) {
             match = matchClause (S, hashTable[hash], hashUsed[hash], buffer, size);
             if (match == 0) {
               if (S->warning != NOWARNING) {
-                printf ("\rc WARNING: deleted clause does not occur: "); printClause (buffer); }
+                printf ("\rc WARNING: deleted clause on line %i does not occur: ", proofLine); printClause (buffer); }
               if (S->warning == HARDWARNING) exit (HARDWARNING);
               goto end_delete; }
             if (S->mode == FORWARD_SAT) S->DB[ match - 2 ] = rem;
