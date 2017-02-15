@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
 Copyright (c) 2015-2016 Marijn Heule, The University of Texas at Austin.
-Last edit, December 16, 2016
+Last edit, February 14, 2017
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -155,7 +155,8 @@ void analyze (struct solver* S, int* clause, int index) {     // Mark all clause
   S->processed = S->assigned = S->forced; }
 
 int propagate (struct solver* S, int init) {        // Performs unit propagation
-  int *start[2], check = 0, mode = !S->prep;
+  int **start = (int**) malloc (sizeof(int*) * 2);
+  int check = 0, mode = !S->prep;
   int i, lit, _lit = 0; long *watch, *_watch;
   start[0] = start[1] = S->processed;
   flip_check:;
@@ -810,7 +811,7 @@ int read_lit (FILE *proofFile, int *lit) {
   else       *lit = (l >> 1);
   return 1; }
 
-int shuffleProof (struct solver *S, int iteration) {
+void shuffleProof (struct solver *S, int iteration) {
   int i, step, _step;
 
   double base = 500;
@@ -919,6 +920,10 @@ int parse (struct solver* S) {
       char ignore[1024];
       if (!fileSwitchFlag) { if (fgets (ignore, sizeof (ignore), S->inputFile) == NULL) printf ("c\n"); }
       else if (fgets (ignore, sizeof (ignore), S->proofFile) == NULL) printf ("c\n");
+      for (i = 0; i < 1024; i++) { if (ignore[i] == '\n') break; }
+      if (i == 1024) {
+        printf ("c ERROR: comment longer than 1024 characters: %s\n", ignore);
+        exit (HARDWARNING); }
       if (S->verb) printf ("\rc WARNING: parsing mismatch assuming a comment\n");
       continue; }
 
