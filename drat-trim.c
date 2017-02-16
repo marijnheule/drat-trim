@@ -944,7 +944,7 @@ int parse (struct solver* S) {
       for (i = 0; i < size; ++i) {
         if (buffer[i] == buffer[i+1]) {
           if (S->warning != NOWARNING) {
-            printf ("\rc WARNING: detected and deleted duplicate literal: "); printClause (buffer); }
+            printf ("\rc WARNING: detected and deleted duplicate literal %i at position %i of line %i\n", buffer[i + 1], i + 1, proofLine); }
           if (S->warning == HARDWARNING) exit (HARDWARNING); }
         else { buffer[j++] = buffer[i]; } }
       buffer[j] = 0; size = j;
@@ -1074,25 +1074,6 @@ void freeMemory (struct solver *S) {
   free (S->dependencies);
   return; }
 
-void removeSteps (struct solver*S, int begin, int end) {
-  int step, _step;
-
-  _step = 0;
-  for (step = 0; step < S->nStep; step++) {
-    long ad = S->proof[step];
-    int *clause = S->DB + (ad >> INFOBITS);
-    if (step < begin || step >= end) {
-      if (clause[ID] & ACTIVE) clause[ID] ^= ACTIVE;
-      S->proof[_step++] = S->proof[step]; }
-    else {
-//      printf("c remove proof step "); if (ad & 1) printf("d "); printClause (clause);
-    } }
-
-  S->nStep = _step;
-  S->mode = BACKWARD_UNSAT;
-  verify (S, 0, 0);
-  S->mode = FORWARD_UNSAT; }
-
 int onlyDelete (struct solver* S, int begin, int end) {
   int step;
   for (step = begin; step < end; step++)
@@ -1207,35 +1188,7 @@ int main (int argc, char** argv) {
   long runtime = (current_time.tv_sec  - S.start_time.tv_sec) * 1000000 +
                  (current_time.tv_usec - S.start_time.tv_usec);
   printf ("\rc verification time: %.3f seconds\n", (double) (runtime / 1000000.0));
-/*
-  start:;
 
-  S.mode = FORWARD_UNSAT;
-
-  for (i = 2; i < 2 * S.nStep; i *=2) {
-    int j;
-    int size = S.nStep / i;
-    if (size * i < S.nStep) size++;
-    for (j = 1; j * size < S.nStep; j++) {
-      if (onlyDelete (&S, (j-1) * size, j * size)) continue;
-      printf ("c interval [%i,%i> (%i)\n", (j-1) * size, j * size, S.nStep);
-      int res = verify (&S, (j-1) * size, j * size);
-      if (res == UNSAT) {
-        removeSteps (&S, (j-1) * size, j * size);
-        j = 0;
-      }
-    }
-    if (onlyDelete (&S, (j-1) * size, j * size) == 0) {
-      printf ("c interval [%i,%i>\n", (j-1) * size, S.nStep);
-      int res = verify (&S, (j-1) * size, S.nStep);
-      if (res == UNSAT) removeSteps (&S, (j-1) * size, S.nStep); }
-  }
-
-  S.mode= BACKWARD_UNSAT;
-  verify (&S, 0, 0);
-  verify (&S, 0, 0);
-  goto start;
-*/
   if (S.optimize) {
     int iteration = 1;
     while (S.nRemoved) {
