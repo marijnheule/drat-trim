@@ -841,7 +841,7 @@ void shuffleProof (struct solver *S, int iteration) {
 int parse (struct solver* S) {
   int tmp, active = 0, retvalue = SAT;
   int del = 0, proofLine = 0;
-  int *buffer, bsize;
+  int *buffer, bufferAlloc;
 
   S->nVars    = 0;
   S->nClauses = 0;
@@ -855,8 +855,8 @@ int parse (struct solver* S) {
 
   printf ("\rc parsing input formula with %i variables and %li clauses\n", S->nVars, S->nClauses);
 
-  bsize = S->nVars*2;
-  if ((buffer = (int*) malloc (bsize * sizeof (int))) == NULL) return ERROR;
+  bufferAlloc = INIT;
+  buffer = (int*) malloc (sizeof (int) * bufferAlloc);
 
   S->count    = 1;
   S->nStep    = 0;
@@ -928,9 +928,6 @@ int parse (struct solver* S) {
       continue; }
 
     if (abs (lit) > S->maxVar) S->maxVar = abs (lit);
-    if (S->maxVar >= bsize) { bsize *= 2;
-      buffer = (int*) realloc (buffer, sizeof (int) * bsize); }
-
     if (tmp == EOF && fileSwitchFlag) break;
     if (abs (lit) > S->nVars && !fileSwitchFlag) {
       printf ("\rc illegal literal %i due to max var %i\n", lit, S->nVars); exit (0); }
@@ -944,7 +941,7 @@ int parse (struct solver* S) {
       for (i = 0; i < size; ++i) {
         if (buffer[i] == buffer[i+1]) {
           if (S->warning != NOWARNING) {
-            printf ("\rc WARNING: detected and deleted duplicate literal %i at position %i of line %i\n", buffer[i + 1], i + 1, proofLine); }
+            printf ("\rc WARNING: detected and deleted duplicate literal %i at position %i of line %i\n", buffer[i+1], i+1, proofLine); }
           if (S->warning == HARDWARNING) exit (HARDWARNING); }
         else { buffer[j++] = buffer[i]; } }
       buffer[j] = 0; size = j;
@@ -957,7 +954,7 @@ int parse (struct solver* S) {
         if (S->warning == HARDWARNING) exit (HARDWARNING);
         del = 0; size = 0; continue; }
       int rem = buffer[0];
-      buffer[ size ] = 0;
+      buffer[size] = 0;
       unsigned int hash = getHash (buffer);
       if (del) {
         if (S->delete) {
@@ -1004,7 +1001,10 @@ int parse (struct solver* S) {
 
       if (!nZeros) S->lemmas   = (long) (clause - S->DB); // S->lemmas is no longer pointer
       size = 0; del = 0; --nZeros; }                      // Reset buffer
-   else buffer[ size++ ] = lit; }                         // Add literal to buffer
+   else {
+     if (size == bufferAlloc) { bufferAlloc = (bufferAlloc * 3) >> 1;
+       buffer = (int*) realloc (buffer, sizeof (int) * bufferAlloc); }
+     buffer[size++] = lit; } }                           // Add literal to buffer
 
   if (S->mode == FORWARD_SAT && active) {
     if (S->warning != NOWARNING)
