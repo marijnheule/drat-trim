@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
 Copyright (c) 2015-2016 Marijn Heule, The University of Texas at Austin.
-Last edit, December 16, 2016
+Last edit, February 16, 2017
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -155,7 +155,8 @@ void analyze (struct solver* S, int* clause, int index) {     // Mark all clause
   S->processed = S->assigned = S->forced; }
 
 int propagate (struct solver* S, int init) {        // Performs unit propagation
-  int *start[2], check = 0, mode = !S->prep;
+  int **start = (int**) malloc (sizeof(int*) * 2);
+  int check = 0, mode = !S->prep;
   int i, lit, _lit = 0; long *watch, *_watch;
   start[0] = start[1] = S->processed;
   flip_check:;
@@ -336,8 +337,8 @@ void postprocess (struct solver *S) {
   printNoCore (S);
   printActive (S);
   printCore   (S);
-  printProof  (S);   // closes lratFile
-  printTrace  (S); } // closes traceFile
+  printTrace  (S);   // closes traceFile
+  printProof  (S); } // closes lratFile
 
 void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode) {
   FILE *file = NULL;
@@ -359,7 +360,7 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
         if (lit != reslit)
           fprintf (file, "%i ", lit); } }
     else {
-      fprintf (file, "%u ", S->count - 1); }
+      fprintf (file, "%u ", S->count); }
     fprintf (file, "0 ");
 
     int isRUP = 1;
@@ -649,12 +650,16 @@ int verify (struct solver *S, int begin, int end) {
 
     if (d && S->mode == FORWARD_SAT) {
       if (size == -1) propagateUnits (S, 0);  // necessary?
-      if (redundancyCheck (S, lemmas, size) == FAILED) return SAT;
+      if (redundancyCheck (S, lemmas, size) == FAILED)  {
+        printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
+        return SAT; }
       continue; }
 
     if (d == 0 && S->mode == FORWARD_UNSAT) {
       if (step > end) {
-      if (redundancyCheck (S, lemmas, size) == FAILED) return SAT;
+      if (redundancyCheck (S, lemmas, size) == FAILED) {
+        printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
+        return SAT; }
       size = sortSize (S, lemmas);
       S->nDependencies = 0; } }
 
@@ -767,7 +772,9 @@ int verify (struct solver *S, int begin, int end) {
     if (S->verb) {
       printf ("\rc validating clause (%i, %i):  ", clause[PIVOT], size); printClause (clause); }
 
-    if (redundancyCheck (S, clause, size) == FAILED) return SAT;
+    if (redundancyCheck (S, clause, size) == FAILED) {
+      printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
+      return SAT; }
     checked++;
     S->optproof[S->nOpt++] = ad; }
 
@@ -805,7 +812,7 @@ int read_lit (FILE *proofFile, int *lit) {
   else       *lit = (l >> 1);
   return 1; }
 
-int shuffleProof (struct solver *S, int iteration) {
+void shuffleProof (struct solver *S, int iteration) {
   int i, step, _step;
 
   double base = 500;
@@ -834,8 +841,8 @@ int shuffleProof (struct solver *S, int iteration) {
 
 int parse (struct solver* S) {
   int tmp, active = 0, retvalue = SAT;
-  int del = 0;
-  int *buffer, bsize;
+  int del = 0, proofLine = 0;
+  int *buffer, bufferAlloc;
 
   S->nVars    = 0;
   S->nClauses = 0;
@@ -849,8 +856,8 @@ int parse (struct solver* S) {
 
   printf ("\rc parsing input formula with %i variables and %li clauses\n", S->nVars, S->nClauses);
 
-  bsize = S->nVars*2;
-  if ((buffer = (int*) malloc (bsize * sizeof (int))) == NULL) return ERROR;
+  bufferAlloc = INIT;
+  buffer = (int*) malloc (sizeof (int) * bufferAlloc);
 
   S->count    = 1;
   S->nStep    = 0;
@@ -914,17 +921,19 @@ int parse (struct solver* S) {
       char ignore[1024];
       if (!fileSwitchFlag) { if (fgets (ignore, sizeof (ignore), S->inputFile) == NULL) printf ("c\n"); }
       else if (fgets (ignore, sizeof (ignore), S->proofFile) == NULL) printf ("c\n");
+      for (i = 0; i < 1024; i++) { if (ignore[i] == '\n') break; }
+      if (i == 1024) {
+        printf ("c ERROR: comment longer than 1024 characters: %s\n", ignore);
+        exit (HARDWARNING); }
       if (S->verb) printf ("\rc WARNING: parsing mismatch assuming a comment\n");
       continue; }
 
     if (abs (lit) > S->maxVar) S->maxVar = abs (lit);
-    if (S->maxVar >= bsize) { bsize *= 2;
-      buffer = (int*) realloc (buffer, sizeof (int) * bsize); }
-
     if (tmp == EOF && fileSwitchFlag) break;
     if (abs (lit) > S->nVars && !fileSwitchFlag) {
       printf ("\rc illegal literal %i due to max var %i\n", lit, S->nVars); exit (0); }
     if (!lit) {
+      if (fileSwitchFlag) proofLine++;
       if (size > S->maxSize) S->maxSize = size;
       int pivot = buffer[0];
       buffer[size] = 0;
@@ -933,7 +942,7 @@ int parse (struct solver* S) {
       for (i = 0; i < size; ++i) {
         if (buffer[i] == buffer[i+1]) {
           if (S->warning != NOWARNING) {
-            printf ("\rc WARNING: detected and deleted duplicate literal: "); printClause (buffer); }
+            printf ("\rc WARNING: detected and deleted duplicate literal %i at position %i of line %i\n", buffer[i+1], i+1, proofLine); }
           if (S->warning == HARDWARNING) exit (HARDWARNING); }
         else { buffer[j++] = buffer[i]; } }
       buffer[j] = 0; size = j;
@@ -946,7 +955,7 @@ int parse (struct solver* S) {
         if (S->warning == HARDWARNING) exit (HARDWARNING);
         del = 0; size = 0; continue; }
       int rem = buffer[0];
-      buffer[ size ] = 0;
+      buffer[size] = 0;
       unsigned int hash = getHash (buffer);
       if (del) {
         if (S->delete) {
@@ -954,7 +963,7 @@ int parse (struct solver* S) {
             match = matchClause (S, hashTable[hash], hashUsed[hash], buffer, size);
             if (match == 0) {
               if (S->warning != NOWARNING) {
-                printf ("\rc WARNING: deleted clause does not occur: "); printClause (buffer); }
+                printf ("\rc WARNING: deleted clause on line %i does not occur: ", proofLine); printClause (buffer); }
               if (S->warning == HARDWARNING) exit (HARDWARNING);
               goto end_delete; }
             if (S->mode == FORWARD_SAT) S->DB[ match - 2 ] = rem;
@@ -993,7 +1002,10 @@ int parse (struct solver* S) {
 
       if (!nZeros) S->lemmas   = (long) (clause - S->DB); // S->lemmas is no longer pointer
       size = 0; del = 0; --nZeros; }                      // Reset buffer
-   else buffer[ size++ ] = lit; }                         // Add literal to buffer
+   else {
+     if (size == bufferAlloc) { bufferAlloc = (bufferAlloc * 3) >> 1;
+       buffer = (int*) realloc (buffer, sizeof (int) * bufferAlloc); }
+     buffer[size++] = lit; } }                           // Add literal to buffer
 
   if (S->mode == FORWARD_SAT && active) {
     if (S->warning != NOWARNING)
@@ -1062,25 +1074,6 @@ void freeMemory (struct solver *S) {
   free (S->RATset);
   free (S->dependencies);
   return; }
-
-void removeSteps (struct solver*S, int begin, int end) {
-  int step, _step;
-
-  _step = 0;
-  for (step = 0; step < S->nStep; step++) {
-    long ad = S->proof[step];
-    int *clause = S->DB + (ad >> INFOBITS);
-    if (step < begin || step >= end) {
-      if (clause[ID] & ACTIVE) clause[ID] ^= ACTIVE;
-      S->proof[_step++] = S->proof[step]; }
-    else {
-//      printf("c remove proof step "); if (ad & 1) printf("d "); printClause (clause);
-    } }
-
-  S->nStep = _step;
-  S->mode = BACKWARD_UNSAT;
-  verify (S, 0, 0);
-  S->mode = FORWARD_UNSAT; }
 
 int onlyDelete (struct solver* S, int begin, int end) {
   int step;
@@ -1196,35 +1189,7 @@ int main (int argc, char** argv) {
   long runtime = (current_time.tv_sec  - S.start_time.tv_sec) * 1000000 +
                  (current_time.tv_usec - S.start_time.tv_usec);
   printf ("\rc verification time: %.3f seconds\n", (double) (runtime / 1000000.0));
-/*
-  start:;
 
-  S.mode = FORWARD_UNSAT;
-
-  for (i = 2; i < 2 * S.nStep; i *=2) {
-    int j;
-    int size = S.nStep / i;
-    if (size * i < S.nStep) size++;
-    for (j = 1; j * size < S.nStep; j++) {
-      if (onlyDelete (&S, (j-1) * size, j * size)) continue;
-      printf ("c interval [%i,%i> (%i)\n", (j-1) * size, j * size, S.nStep);
-      int res = verify (&S, (j-1) * size, j * size);
-      if (res == UNSAT) {
-        removeSteps (&S, (j-1) * size, j * size);
-        j = 0;
-      }
-    }
-    if (onlyDelete (&S, (j-1) * size, j * size) == 0) {
-      printf ("c interval [%i,%i>\n", (j-1) * size, S.nStep);
-      int res = verify (&S, (j-1) * size, S.nStep);
-      if (res == UNSAT) removeSteps (&S, (j-1) * size, S.nStep); }
-  }
-
-  S.mode= BACKWARD_UNSAT;
-  verify (&S, 0, 0);
-  verify (&S, 0, 0);
-  goto start;
-*/
   if (S.optimize) {
     int iteration = 1;
     while (S.nRemoved) {
