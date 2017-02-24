@@ -360,7 +360,7 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
         if (lit != reslit)
           fprintf (file, "%i ", lit); } }
     else {
-      fprintf (file, "%u ", S->count - 1); }
+      fprintf (file, "%u ", S->count); }
     fprintf (file, "0 ");
 
     int isRUP = 1;
