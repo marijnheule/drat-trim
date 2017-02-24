@@ -352,8 +352,12 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
       int sortClause[S->maxSize];
       fprintf (file, "%lu ", S->time >> 1);
       int reslit = clause[PIVOT];
-      fprintf (file, "%i ", reslit);
-      while (*clause) sortClause[size++] = *clause++;
+//      fprintf (file, "%i ", reslit);
+      while (*clause) {
+        if (*clause == reslit)
+          fprintf (file, "%i ", reslit);
+        sortClause[size++] = *clause++;
+      }
       qsort (sortClause, size, sizeof (int), abscompare);
       for (i = 0; i < size; i++) {
         int lit = sortClause[i];
