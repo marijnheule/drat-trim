@@ -607,6 +607,7 @@ int verify (struct solver *S, int begin, int end) {
     if (begin == end)
       printf ("\rc start forward verification\n"); }
   int step;
+  int adds = 0;
   int active = S->nClauses;
   for (step = 0; step < S->nStep; step++) {
     if (step >= begin && step < end) continue;
@@ -614,7 +615,8 @@ int verify (struct solver *S, int begin, int end) {
     int *lemmas = S->DB + (ad >> INFOBITS);
 
     S->time = lemmas[ID];
-    if (d) active--; else active++;
+    if (d) { active--; }
+    else   { active++; adds++; }
     if (S->mode == FORWARD_SAT && S->verb) printf ("\rc %i active clauses\n", active);
 
     if (!lemmas[1]) { // found a unit
@@ -707,7 +709,7 @@ int verify (struct solver *S, int begin, int end) {
 
   int checked = 0, skipped = 0;
 
-  double max = (double) step;
+  double max = (double) adds;
 
   struct timeval backward_time;
   gettimeofday (&backward_time, NULL);
@@ -718,12 +720,12 @@ int verify (struct solver *S, int begin, int end) {
     if (seconds > S->timeout) printf ("s TIMEOUT\n"), exit (0);
 
     if (S->bar)
-      if ((step % 1000) == 0) {
+      if ((adds % 1000) == 0) {
         int f;
         long runtime = (current_time.tv_sec  - backward_time.tv_sec ) * 1000000 +
                        (current_time.tv_usec - backward_time.tv_usec);
         double time = (double) (runtime / 1000000.0);
-        double fraction = (step * 1.0) / max;
+        double fraction = (adds * 1.0) / max;
         printf("\rc %.2f%% [", 100.0 * (1.0 - fraction));
         for (f = 1; f <= 20; f++) {
           if ((1.0 - fraction) * 20.0 < 1.0 * f) printf(" ");
@@ -735,11 +737,10 @@ int verify (struct solver *S, int begin, int end) {
     long ad = S->proof[step]; long d = ad & 1;
     int *clause = S->DB + (ad >> INFOBITS);
 
-//    printf("c backward step "); if (ad & 1) printf("d ");
-//    printClause (clause);
 
     if (ad == 0) continue; // Skip lemma that has been removed from proof
     if ( d == 0) {
+      adds--;
       if (clause[1]) {
         removeWatch (S, clause, 0), removeWatch (S, clause, 1);
         if (S->reason[abs (clause[0])] == (clause + 1 - S->DB)) {  // use this check also for units?
