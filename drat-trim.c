@@ -292,7 +292,7 @@ void printProof (struct solver *S) {
       if ((ad & 1) == 0) {
         if (lastAdded == 0) fprintf (S->lratFile, "0\n");
         lastAdded = lemmas[ID] >> 1; }
-      else if (!lemmas[1] && (ad & 1)) continue; // don't delete unit clauses
+//      else if (!lemmas[1] && (ad & 1)) continue; // don't delete unit clauses
       else if (ad & 1) {
         if (lastAdded != 0) fprintf (S->lratFile, "%i d ", lastAdded);
         lastAdded = 0;
@@ -352,8 +352,12 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
       int sortClause[S->maxSize];
       fprintf (file, "%lu ", S->time >> 1);
       int reslit = clause[PIVOT];
-      fprintf (file, "%i ", reslit);
-      while (*clause) sortClause[size++] = *clause++;
+//      fprintf (file, "%i ", reslit);
+      while (*clause) {
+        if (*clause == reslit)
+          fprintf (file, "%i ", reslit);
+        sortClause[size++] = *clause++;
+      }
       qsort (sortClause, size, sizeof (int), abscompare);
       for (i = 0; i < size; i++) {
         int lit = sortClause[i];
