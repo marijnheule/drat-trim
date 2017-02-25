@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
 Copyright (c) 2015-2016 Marijn Heule, The University of Texas at Austin.
-Last edit, February 16, 2017
+Last edit, February 25, 2017
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -1003,9 +1003,9 @@ int parse (struct solver* S) {
       if (!nZeros) S->lemmas   = (long) (clause - S->DB); // S->lemmas is no longer pointer
       size = 0; del = 0; --nZeros; }                      // Reset buffer
    else {
+     buffer[size++] = lit;                                // Add literal to buffer
      if (size == bufferAlloc) { bufferAlloc = (bufferAlloc * 3) >> 1;
-       buffer = (int*) realloc (buffer, sizeof (int) * bufferAlloc); }
-     buffer[size++] = lit; } }                           // Add literal to buffer
+       buffer = (int*) realloc (buffer, sizeof (int) * bufferAlloc); } } }
 
   if (S->mode == FORWARD_SAT && active) {
     if (S->warning != NOWARNING)
