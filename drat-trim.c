@@ -50,7 +50,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 struct solver { FILE *inputFile, *proofFile, *lratFile, *traceFile, *activeFile;
     int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode, optimize,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, nActive,
-      nLemmas, maxRAT, *RATset, *preRAT, maxDependencies, nDependencies, bar, backforce,
+      nLemmas, maxRAT, *RATset, *preRAT, maxDependencies, nDependencies, bar, backforce, reduce,
       *dependencies, maxVar, maxSize, mode, verb, unitSize, prep, *current, nRemoved, warning;
     char *coreStr, *lemmaStr;
     struct timeval start_time;
@@ -144,7 +144,7 @@ void analyze (struct solver* S, int* clause, int index) {     // Mark all clause
         markClause (S, S->DB + S->reason[abs (lit)], -1);
         if (S->assigned >= S->forced)
           S->reason[abs (lit)] = 0; } }
-    else if (S->false[lit] == ASSUMED && !S->RATmode) { // Remove unused literal
+    else if (S->false[lit] == ASSUMED && !S->RATmode && S->reduce) { // Remove unused literal
       S->nRemoved++;
       int *tmp = S->current;
       while (*tmp != lit) tmp++;
@@ -352,7 +352,6 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
       int sortClause[S->maxSize];
       fprintf (file, "%lu ", S->time >> 1);
       int reslit = clause[PIVOT];
-//      fprintf (file, "%i ", reslit);
       while (*clause) {
         if (*clause == reslit)
           fprintf (file, "%i ", reslit);
@@ -425,7 +424,7 @@ int checkRAT (struct solver *S, int pivot) {
 	while (*watched)
           if (*watched++ == -pivot) {
             if ((S->mode == BACKWARD_UNSAT) && !active) {
-              printf ("\rc RAT check ignores unmarked clause : "); printClause (S->DB + (S->wlist[i][j] >> 1));
+//              printf ("\rc RAT check ignores unmarked clause : "); printClause (S->DB + (S->wlist[i][j] >> 1));
               continue; }
 	    if (nRAT == S->maxRAT) {
 	      S->maxRAT = (S->maxRAT * 3) >> 1;
@@ -445,6 +444,8 @@ int checkRAT (struct solver *S, int pivot) {
     if (S->verb) {
       printf ("\rc RAT clause: "); printClause (RATcls); }
 
+    if (id == 1169002) printClause (RATcls);
+
     while (*RATcls) {
       int lit = *RATcls++;
       if (lit != -pivot && S->false[-lit])
@@ -454,6 +455,8 @@ int checkRAT (struct solver *S, int pivot) {
     if (blocked && reason) {
       analyze (S, S->DB + reason, -1);
       S->reason[abs (blocked)] = 0; }
+
+    if (id == 1169002) printf("%i %i %li\n", i, blocked, reason);
 
     if (!blocked) {
       RATcls = S->DB + S->RATset[i];
@@ -1103,6 +1106,7 @@ void printHelp ( ) {
   printf ("  -w          suppress warning messages\n");
   printf ("  -W          exit after first warning\n");
   printf ("  -p          run in plain mode (i.e., ignore deletion information)\n\n");
+  printf ("  -R          turn off reduce mode\n\n");
   printf ("  -S          run in SAT check mode (forward checking)\n\n");
   printf ("and input and proof are specified as follows\n\n");
   printf ("  INPUT       input file in DIMACS format\n");
@@ -1129,6 +1133,7 @@ int main (int argc, char** argv) {
   S.bar        = 0;
   S.mode       = BACKWARD_UNSAT;
   S.delete     = 1;
+  S.reduce     = 1;
   S.binMode    = 0;
   gettimeofday (&S.start_time, NULL);
 
@@ -1150,6 +1155,7 @@ int main (int argc, char** argv) {
       else if (argv[i][1] == 'w') S.warning    = NOWARNING;
       else if (argv[i][1] == 'W') S.warning    = HARDWARNING;
       else if (argv[i][1] == 'p') S.delete     = 0;
+      else if (argv[i][1] == 'R') S.reduce     = 0;
       else if (argv[i][1] == 'f') S.mode       = FORWARD_UNSAT;
       else if (argv[i][1] == 'S') S.mode       = FORWARD_SAT; }
     else {
