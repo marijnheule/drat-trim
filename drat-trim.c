@@ -292,7 +292,7 @@ void printProof (struct solver *S) {
       if ((ad & 1) == 0) {
         if (lastAdded == 0) fprintf (S->lratFile, "0\n");
         lastAdded = lemmas[ID] >> 1; }
-//      else if (!lemmas[1] && (ad & 1)) continue; // don't delete unit clauses
+      else if (!lemmas[1] && (ad & 1)) continue; // don't delete unit clauses
       else if (ad & 1) {
         if (lastAdded != 0) fprintf (S->lratFile, "%i d ", lastAdded);
         lastAdded = 0;
