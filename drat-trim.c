@@ -456,8 +456,6 @@ int checkRAT (struct solver *S, int pivot) {
       analyze (S, S->DB + reason, -1);
       S->reason[abs (blocked)] = 0; }
 
-    if (id == 1169002) printf("%i %i %li\n", i, blocked, reason);
-
     if (!blocked) {
       RATcls = S->DB + S->RATset[i];
       while (*RATcls) {
