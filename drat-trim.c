@@ -292,12 +292,13 @@ void printProof (struct solver *S) {
       if ((ad & 1) == 0) {
         if (lastAdded == 0) fprintf (S->lratFile, "0\n");
         lastAdded = lemmas[ID] >> 1; }
+      else if (lastAdded == S->nClauses) continue;
       else if (!lemmas[1] && (ad & 1)) continue; // don't delete unit clauses
       else if (ad & 1) {
         if (lastAdded != 0) fprintf (S->lratFile, "%i d ", lastAdded);
         lastAdded = 0;
         fprintf (S->lratFile, "%i ", lemmas[ID] >> 1); } }
-    fprintf(S->lratFile, "0\n");
+    if (lastAdded != S->nClauses) fprintf(S->lratFile, "0\n");
     fclose (S->lratFile); } }
 
 void printNoCore (struct solver *S) {
@@ -432,6 +433,7 @@ int checkRAT (struct solver *S, int pivot) {
 	    S->RATset[nRAT++] = S->wlist[i][j] >> 1;
             break; } } } }
 
+  // S->prep = 1;
   // Check all clauses in RATset for RUP
   int flag = 1;
   qsort (S->RATset, nRAT, sizeof (int), compare);
@@ -469,6 +471,8 @@ int checkRAT (struct solver *S, int pivot) {
     while (S->forced < S->assigned) S->false[*(--S->assigned)] = 0;
     if (S->verb) printf ("\rc RAT check on pivot %i failed\n", pivot);
     return FAILED; }
+
+  // S->prep = 0;
 
   return SUCCEED; }
 
