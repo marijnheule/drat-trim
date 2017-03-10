@@ -597,6 +597,13 @@ int init (struct solver *S) {
         FILE *lemmaFile = fopen (S->lemmaStr, "w");
         fprintf (lemmaFile, "0\n");
         fclose (lemmaFile); }
+      if (S->lratFile) {
+        int j;
+        for (j = 0; j < i; j++) {
+          int *_clause = S->DB + (S->formula[j] >> INFOBITS);
+          if ((_clause[0] == -clause[0]) && !_clause[1]) break; }
+        fprintf (S->lratFile, "%li 0 %i %i 0\n", S->nClauses + 1, j, i);
+      }
       return UNSAT; }
     else if (!S->false[ -clause[0] ]) {
       addUnit (S, (long) (clause - S->DB));
