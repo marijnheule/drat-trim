@@ -602,7 +602,7 @@ int init (struct solver *S) {
         for (j = 0; j < i; j++) {
           int *_clause = S->DB + (S->formula[j] >> INFOBITS);
           if ((_clause[0] == -clause[0]) && !_clause[1]) break; }
-        fprintf (S->lratFile, "%li 0 %i %i 0\n", S->nClauses + 1, j, i);
+        fprintf (S->lratFile, "%li 0 %i %i 0\n", S->nClauses + 1, j + 1, i + 1);
       }
       return UNSAT; }
     else if (!S->false[ -clause[0] ]) {
