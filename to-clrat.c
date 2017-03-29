@@ -36,7 +36,7 @@ int main (int argc, char** argv) {
 
     if (size == 2) {
       if (del == 0) { fputc ('a', output); write_lit (output, line); write_lit (output, lit); }
-      else          { fputc ('d', output); /*write_lit (output, line);*/ write_lit (output, lit); } }
+      else          { fputc ('d', output); write_lit (output, lit); if (lit == 0) size = 0; } }
 
     if (size > 2) write_lit (output, line);
 
