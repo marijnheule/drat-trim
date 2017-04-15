@@ -857,7 +857,7 @@ void shuffleProof (struct solver *S, int iteration) {
 
 int parse (struct solver* S) {
   int tmp, active = 0, retvalue = SAT;
-  int del = 0, proofLine = 0;
+  int del = 0, fileLine = 0;
   int *buffer, bufferAlloc;
 
   S->nVars    = 0;
@@ -931,6 +931,7 @@ int parse (struct solver* S) {
           printf ("\rc WARNING: early EOF of the input formula\n");
           printf ("\rc WARNING: %i clauses less than expected\n", nZeros); }
         if (S->warning == HARDWARNING) exit (HARDWARNING);
+        fileLine = 0;
         fileSwitchFlag = 1; } }
 
     if (tmp == 0) {
@@ -949,7 +950,7 @@ int parse (struct solver* S) {
     if (abs (lit) > S->nVars && !fileSwitchFlag) {
       printf ("\rc illegal literal %i due to max var %i\n", lit, S->nVars); exit (0); }
     if (!lit) {
-      if (fileSwitchFlag) proofLine++;
+      fileLine++;
       if (size > S->maxSize) S->maxSize = size;
       int pivot = buffer[0];
       buffer[size] = 0;
@@ -958,7 +959,7 @@ int parse (struct solver* S) {
       for (i = 0; i < size; ++i) {
         if (buffer[i] == buffer[i+1]) {
           if (S->warning != NOWARNING) {
-            printf ("\rc WARNING: detected and deleted duplicate literal %i at position %i of line %i\n", buffer[i+1], i+1, proofLine); }
+            printf ("\rc WARNING: detected and deleted duplicate literal %i at position %i of line %i\n", buffer[i+1], i+1, fileLine); }
           if (S->warning == HARDWARNING) exit (HARDWARNING); }
         else { buffer[j++] = buffer[i]; } }
       buffer[j] = 0; size = j;
@@ -979,7 +980,7 @@ int parse (struct solver* S) {
             match = matchClause (S, hashTable[hash], hashUsed[hash], buffer, size);
             if (match == 0) {
               if (S->warning != NOWARNING) {
-                printf ("\rc WARNING: deleted clause on line %i does not occur: ", proofLine); printClause (buffer); }
+                printf ("\rc WARNING: deleted clause on line %i does not occur: ", fileLine); printClause (buffer); }
               if (S->warning == HARDWARNING) exit (HARDWARNING);
               goto end_delete; }
             if (S->mode == FORWARD_SAT) S->DB[ match - 2 ] = rem;
