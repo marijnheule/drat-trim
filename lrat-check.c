@@ -26,44 +26,88 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define LRAT		200
 #define CLRAT		300
 
-int now;
-int nVar, nCls, *cls;
-int *table, tableSize, tableAlloc;
-int *mask, maskSize, maskAlloc;
+long long *mask, now;
 
-int convertLit (lit) {
+int *clsList, clsAlloc;
+int *table, tableSize, tableAlloc, maskSize, maskAlloc;
 
-}
+int  getType   (int* list) { return list[0]; }
+int  getIndex  (int* list) { return list[1]; }
+int  getLength (int* list) { int i; for (i = 2; list[i] != 0; i++); return i - 2; }
+int* getHints  (int* list) { return list + getLength (list) + 1; }
+int  getRATs   (int* list) { int c = 0; while (*list) if ((*list++) < 0) c++; return c; }
+
+int convertLit (int lit)   { return (abs(lit) * 2) + (lit < 0); }
+
+int checkRedundancy (int *hints, int thisMask) {
+  int res = abs(*hints++);
+
+  if (res > 0) {
+    int unit = 0, *clause = table + clsList[res];
+    while (*clause) {
+      clit = convertLit (*clause++);
+      if (mask[clit] >= thisMask) continue; // lit is falsified
+      if (unit != 0) return FAILED;
+      unit = clit; }
+    if (unit == 0) return SUCCESS;
+    mask[clit ^ 1] = thisMask; }
+
+  while (*hints > 0) {
+    int unit = 0, *clause = table + clsList[*hint++];
+    while (*clause) {
+      clit = convertLit (*clause++);
+      if (mask[clit] >= now) continue; // lit is falsified
+      if (unit != 0) return FAILED;
+      unit = clit; }
+    if (unit == 0) return SUCCESS;
+    mask[clit ^ 1] = thisMask; } }
+
+  if (res == 0) return SUCCESS;
+  return FAILED; }
 
 int checkClause (int* list, int size, int* hints) {
-  int i;
-  int pivot = convertLit (list[0]);
+  now++;
+  int i, pivot = convertLit (list[0]);
+  int RATs = getRATs (hints);
   for (i = 0; i < size; i++) {
     int clit = convertLit (list[i]);
     if (clit > maskSize) {
       maskAlloc = (clit * 3) >> 1;
-      mask = (int *) realloc (mask, sizeof(int) * maskAlloc); }
-    mask [clit] = now; }
+      mask = (long long *) realloc (mask, sizeof(long long) * maskAlloc); }
+    mask [clit] = now + RATs; }
 
-  return SUCCESS;
-}
+  int res = checkRedundancy (hints, now + RATs);
+  if (res  == FAILED) return FAILED;
+  if (RATs == 0)      return SUCCESS;
+
+  hints++;
+  while (*hints) {
+    while (*hint > 0) hints++;
+    now++;
+    if (checkRedundancy (hints, now) == FAILED) return FAILED; }
+
+  return SUCCESS; }
 
 void addClause (int index, int* literals, int size) {
+  if (index >= clsAlloc) {
+    clsAlloc = clsAlloc (index * 3) >> 1;
+    clsList = (int*) realloc (clsList, sizeof(int) * clsAlloc); }
+
   if (tableSize + size >= tableAlloc) {
     tableAlloc = (tableAlloc * 3) >> 1;
     table = (int*) realloc (table, sizeof (int) * tableAlloc); }
 
-  int i;
-  for (i = 0; i < size; i++) table[cls[index] + i] = literals[i]; }
+  clsList[index] = tableSize;
+  int i; for (i = 0; i < size; i++) table[tableSize++] = literals[i]; }
 
-void deleteClauses (int *list) {
+void deleteClauses (int* list) {
   while (*list) {
     int index = *list++;
     if (talbe[index] == 0) {
       printf ("c WARNING: clause %i is already deleted\n", index); }
     table[index] = 0; }
 
-void parseLine (FILE* file, int *literalsplushints, int mode) {
+void parseLine (FILE* file, int *list, int mode) {
 
   if (mode == CNF) {
 
@@ -74,23 +118,17 @@ void parseLine (FILE* file, int *literalsplushints, int mode) {
   }
 }
 
-int getType (int* list) {
-  return list[0]; }
-
-int getIndex (int* list) {
-  return list[1]; }
-
-int getLength (int* list) {
-  int i; for (i = 2; list[i] != 0; i++);
-  return i - 2; }
-
-int* getHints (int* list) {
-  return list + getLength (list) + 1; }
-
 int main (int argc, char** argv) {
+  now = 1;
   FILE *cnf, *proof;
 
   cnf   = fopen (argv[1], "r");
+
+  int nVar, nCls;
+  fscanf (cnf, " p cnf %i %i ", &nVar, &nCls);
+
+  clsAlloc = nCls * 2;
+  clsList  = (int*) malloc (sizeof(int) * clsAlloc);
 
   maxVar = nVar;
   maskAlloc = maxVar * 4;
@@ -107,8 +145,7 @@ int main (int argc, char** argv) {
     if (flag == FAILED) break;
 
     if (getType (list) == DEL) {
-      deleteClauses (list + 2);
-    }
+      deleteClauses (list + 2); }
     else if (getType (list) == ADD) {
       int index  = getIndex  (list);
       int length = getLength (list);
