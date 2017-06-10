@@ -145,6 +145,7 @@ int main (int argc, char** argv) {
   while (1) {
     int size = parseLine (cnf, list, CNF);
     if (size == 0) break;
+    printClause (list);
     addClause (index++, list, size); }
   fclose (cnf);
 
@@ -154,8 +155,10 @@ int main (int argc, char** argv) {
   FILE *proof = fopen (argv[2], "r");
   int mode = CLRAT;
   while (1) {
-    int flag = parseLine (proof, list, mode);
-    if (flag == FAILED) break;
+    int size = parseLine (proof, list, mode);
+    if (size == 0) break;
+
+    printClause (list);
 
     if (getType (list) == DEL) {
       deleteClauses (list + 2); }
