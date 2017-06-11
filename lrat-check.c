@@ -30,7 +30,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 long long *mask, now;
 
-int *clsList, clsAlloc;
+int *clsList, clsAlloc, clsLast;
 int *table, tableSize, tableAlloc, maskAlloc;
 
 int  getType   (int* list) { return list[1]; }
@@ -86,7 +86,7 @@ int checkClause (int* list, int size, int* hints) {
     int clit = convertLit (list[i]);
     if (clit > maskAlloc) {
       maskAlloc = (clit * 3) >> 1;
-      mask = (long long *) realloc (mask, sizeof(long long) * maskAlloc); }
+      mask = (long long *) realloc (mask, sizeof (long long) * maskAlloc); }
     mask [clit] = now + RATs; }
 
   int res = checkRedundancy (pivot, 0, hints, now + RATs);
@@ -99,6 +99,13 @@ int checkClause (int* list, int size, int* hints) {
     if (*hints == 0) break;
     if (checkRedundancy (pivot, start, hints, now) == FAILED) return FAILED;
     start = abs(*hints) + 1; }
+
+  while (start <= clsLast) {
+      if (clsList[start++] != DELETED) {
+        int *clause = table + clsList[start-1];
+        while (*clause) {
+          int clit = convertLit (*clause++);
+          if (clit == (pivot^1)) return FAILED; } } }
 
   return SUCCESS; }
 
@@ -113,7 +120,8 @@ void addClause (int index, int* literals, int size) {
 
   clsList[index] = tableSize;
   int i; for (i = 0; i < size; i++) table[tableSize++] = literals[i];
-  table[tableSize++] = 0; }
+  table[tableSize++] = 0;
+  clsLast = index; }
 
 void deleteClauses (int* list) {
   while (*list) {
@@ -156,7 +164,7 @@ int parseLine (FILE* file, int *list, int mode) {
   return 0; }
 
 int main (int argc, char** argv) {
-  now = 0;
+  now = 0, clsLast = 0;
 
   int nVar, nCls;
   FILE* cnf   = fopen (argv[1], "r");
@@ -195,8 +203,6 @@ int main (int argc, char** argv) {
       int  index  = getIndex  (list);
       int  length = getLength (list);
       int* hints  = getHints  (list);
-
-//      printClause (hints + 1);
 
       if (checkClause (list + 2, length, hints) == SUCCESS) {
         addClause (index, list + 2, length); }
