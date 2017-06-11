@@ -1097,12 +1097,19 @@ int parse (struct solver* S) {
   return retvalue; }
 
 void freeMemory (struct solver *S) {
+  int i;
+//  printf("c database size %li; ", S->mem_used);
+//  int sum = 0;
+//  for (i = 1; i <= S->maxVar; i++)
+//    sum += S->max[i] + S->max[-i];
+//  printf(" watch pointers size %i.\n", sum);
+
   free (S->DB);
   free (S->falseStack);
   free (S->reason);
   free (S->proof);
   free (S->formula);
-  int i; for (i = 1; i <= S->maxVar; ++i) { free (S->wlist[i]); free (S->wlist[-i]); }
+  for (i = 1; i <= S->maxVar; ++i) { free (S->wlist[i]); free (S->wlist[-i]); }
   free (S->used  - S->maxVar);
   free (S->max   - S->maxVar);
   free (S->false - S->maxVar);
