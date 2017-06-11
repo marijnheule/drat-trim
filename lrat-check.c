@@ -21,8 +21,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <stdio.h>
 #include <stdlib.h>
 
-#define ADD		1
-#define DEL		0
+#define DELETED		-1
 #define SUCCESS		1
 #define FAILED		0
 #define CNF		100
@@ -34,36 +33,47 @@ long long *mask, now;
 int *clsList, clsAlloc;
 int *table, tableSize, tableAlloc, maskAlloc;
 
-int  getType   (int* list) { return list[0]; }
-int  getIndex  (int* list) { return list[1]; }
+int  getType   (int* list) { return list[1]; }
+int  getIndex  (int* list) { return list[0]; }
 int  getLength (int* list) { int i = 2; while (list[i]) i++; return i - 2; }
-int* getHints  (int* list) { return list + getLength (list) + 1; }
+int* getHints  (int* list) { return list + getLength (list) + 2; }
 int  getRATs   (int* list) { int c = 0; while (*list) if ((*list++) < 0) c++; return c; }
 
 int convertLit (int lit)   { return (abs(lit) * 2) + (lit < 0); }
 
-int checkRedundancy (int *hints, int thisMask) {
+void printClause (int* clause) {
+  while (*clause) printf ("%i ", *clause++); printf ("0\n"); }
+
+int checkRedundancy (int pivot, int start, int *hints, long long thisMask) {
   int res = abs(*hints++);
 
   if (res > 0) {
-    int unit = 0, *clause = table + clsList[res];
+    while (start < res) {
+      if (clsList[start++] != DELETED) {
+        int *clause = table + clsList[start-1];
+        while (*clause) {
+          int clit = convertLit (*clause++);
+          if (clit == (pivot^1)) return FAILED; } } }
+    if (clsList[res] == DELETED) { printf ("c ERROR: using DELECT clause\n"); exit (2); };
+    int flag = 0, *clause = table + clsList[res];
+    while (*clause) {
+      int clit = convertLit (*clause++);
+      if (clit == (pivot^1)) { flag = 1; continue; }
+      if (mask[clit  ] >= thisMask) continue;       // lit is falsified
+      if (mask[clit^1] >= thisMask) return SUCCESS; // blocked
+      mask[clit] = thisMask; }
+    if (flag == 0) return FAILED; }
+
+  while (*hints > 0) {
+    if (clsList[*hints] == DELETED) { printf ("c ERROR: using DELECT clause\n"); exit (2); };
+    int unit = 0, *clause = table + clsList[*hints++];
     while (*clause) {
       int clit = convertLit (*clause++);
       if (mask[clit] >= thisMask) continue; // lit is falsified
       if (unit != 0) return FAILED;
       unit = clit; }
     if (unit == 0) return SUCCESS;
-    mask[unit ^ 1] = thisMask; }
-
-  while (*hints > 0) {
-    int unit = 0, *clause = table + clsList[*hints++];
-    while (*clause) {
-      int clit = convertLit (*clause++);
-      if (mask[clit] >= now) continue; // lit is falsified
-      if (unit != 0) return FAILED;
-      unit = clit; }
-    if (unit == 0) return SUCCESS;
-    mask[unit ^ 1] = thisMask; }
+    mask[unit^1] = thisMask; }
 
   if (res == 0) return SUCCESS;
   return FAILED; }
@@ -71,7 +81,7 @@ int checkRedundancy (int *hints, int thisMask) {
 int checkClause (int* list, int size, int* hints) {
   now++;
   int i, pivot = convertLit (list[0]);
-  int RATs = getRATs (hints);
+  int RATs = getRATs (hints + 1);
   for (i = 0; i < size; i++) {
     int clit = convertLit (list[i]);
     if (clit > maskAlloc) {
@@ -79,21 +89,18 @@ int checkClause (int* list, int size, int* hints) {
       mask = (long long *) realloc (mask, sizeof(long long) * maskAlloc); }
     mask [clit] = now + RATs; }
 
-  int res = checkRedundancy (hints, now + RATs);
+  int res = checkRedundancy (pivot, 0, hints, now + RATs);
   if (res  == FAILED) return FAILED;
   if (RATs == 0)      return SUCCESS;
 
-  hints++;
-  while (*hints) {
-    while (*hints > 0) hints++;
-    now++;
-    if (checkRedundancy (hints, now) == FAILED) return FAILED; }
+  int start = 1;
+  while (1) {
+    hints++; now++; while (*hints > 0) hints++;
+    if (*hints == 0) break;
+    if (checkRedundancy (pivot, start, hints, now) == FAILED) return FAILED;
+    start = abs(*hints) + 1; }
 
   return SUCCESS; }
-
-void printClause (int* clause) {
-  while (*clause) printf ("%i ", *clause++);
-  printf ("0\n"); }
 
 void addClause (int index, int* literals, int size) {
   if (index >= clsAlloc) {
@@ -105,17 +112,18 @@ void addClause (int index, int* literals, int size) {
     table = (int*) realloc (table, sizeof (int) * tableAlloc); }
 
   clsList[index] = tableSize;
-  int i; for (i = 0; i < size; i++) table[tableSize++] = literals[i]; }
+  int i; for (i = 0; i < size; i++) table[tableSize++] = literals[i];
+  table[tableSize++] = 0; }
 
 void deleteClauses (int* list) {
   while (*list) {
     int index = *list++;
-    if (table[index] == 0) {
+    if (clsList[index] == DELETED) {
       printf ("c WARNING: clause %i is already deleted\n", index); }
-    table[index] = 0; } }
+    clsList[index] = DELETED; } }
 
 int parseLine (FILE* file, int *list, int mode) {
-  int lit, tmp, count = 0;
+  int lit, index, tmp, count = 0;
 
   if (mode == CNF) {
     while (1) {
@@ -124,10 +132,31 @@ int parseLine (FILE* file, int *list, int mode) {
       list[count++] = lit;
       if (lit == 0) return count; } }
 
+  if (mode == LRAT) {
+    int zeros = 2;
+    tmp = fscanf (file, " %i ", &index);
+    if (tmp == 0 || tmp == EOF) return 0;
+    list[count++] = index;
+
+    tmp = fscanf (file, " d %i ", &lit);
+    if (tmp == 1) {
+      list[count++] = (int) 'd';
+      list[count++] = lit; zeros--;
+      if (lit == 0) zeros--;
+      if (zeros == 0) return count; }
+    else { list[count++] = (int) 'a'; }
+
+    while (1) {
+      tmp = fscanf (file, " %i ", &lit);
+      if (tmp == 0 || tmp == EOF) return 0;
+      list[count++] = lit;
+      if (lit   == 0) zeros--;
+      if (zeros == 0) return count; } }
+
   return 0; }
 
 int main (int argc, char** argv) {
-  now = 1;
+  now = 0;
 
   int nVar, nCls;
   FILE* cnf   = fopen (argv[1], "r");
@@ -145,33 +174,34 @@ int main (int argc, char** argv) {
   while (1) {
     int size = parseLine (cnf, list, CNF);
     if (size == 0) break;
-    printClause (list);
+//    printClause (list);
     addClause (index++, list, size); }
   fclose (cnf);
 
   maskAlloc = 2 * nVar;
   mask = (long long*) malloc (sizeof(long long) * maskAlloc);
+  int i; for (i = 0; i < maskAlloc; i++) mask[i] = 0;
 
-  FILE *proof = fopen (argv[2], "r");
-  int mode = CLRAT;
+  FILE* proof = fopen (argv[2], "r");
+  int mode = LRAT;
   while (1) {
     int size = parseLine (proof, list, mode);
+//    printClause (list);
     if (size == 0) break;
 
-    printClause (list);
-
-    if (getType (list) == DEL) {
+    if (getType (list) == (int) 'd') {
       deleteClauses (list + 2); }
-    else if (getType (list) == ADD) {
-      int index  = getIndex  (list);
-      int length = getLength (list);
-      int *hints = getHints  (list);
+    else if (getType (list) == (int) 'a') {
+      int  index  = getIndex  (list);
+      int  length = getLength (list);
+      int* hints  = getHints  (list);
+
+//      printClause (hints + 1);
 
       if (checkClause (list + 2, length, hints) == SUCCESS) {
         addClause (index, list + 2, length); }
       else {
-        printf("c failed to check clause: ");
-        printClause (list + 2);
+        printf("c failed to check clause: "); printClause (list + 2);
         printf("c NOT VERIFIED\n");
         exit (0); }
 
