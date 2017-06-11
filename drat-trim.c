@@ -26,7 +26,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #define TIMEOUT     20000
 #define BIGINIT     1000000
-#define INIT        8
+#define INIT        4
 #define END         0
 #define UNSAT       0
 #define SAT         1
@@ -72,7 +72,9 @@ static inline void printClause (int* clause) {
 
 static inline void addWatchPtr (struct solver* S, int lit, long watch) {
   if (S->used[lit] + 1 == S->max[lit]) { S->max[lit] *= 1.5;
-    S->wlist[lit] = (long*) realloc (S->wlist[lit], sizeof (long) * S->max[lit]); }
+    S->wlist[lit] = (long *) realloc (S->wlist[lit], sizeof (long) * S->max[lit]);
+    if (S->max[lit] > 1000) printf("c watchlist %i increased to %i\n", lit, S->max[lit]);
+    if (S->wlist[lit] == NULL) { printf("c MEMOUT: reallocation failed for watch list of %i\n", lit); exit (0); } }
   S->wlist[lit][ S->used[lit]++ ] = watch | S->mask;
   S->wlist[lit][ S->used[lit]   ] = END; }
 
@@ -80,9 +82,12 @@ static inline void addWatch (struct solver* S, int* clause, int index) {
   addWatchPtr (S, clause[index], ((long) (((clause) - S->DB)) << 1)); }
 
 static inline void removeWatch (struct solver* S, int* clause, int index) {
-  int lit = clause[index]; long *watch = S->wlist[lit];
-  int i;
-//  for (;;) {
+  int i, lit = clause[index];
+  if ((S->used[lit] > INIT) && (S->max[lit] > 2 * S->used[lit])) {
+    S->max[lit] = (3 * S->used[lit]) >> 1;
+    S->wlist[lit] = (long *) realloc (S->wlist[lit], sizeof (long) * S->max[lit]);
+    assert(S->wlist[lit] != NULL); }
+  long *watch = S->wlist[lit];
   for (i = 0; i < S->used[lit]; i++) {
     int* _clause = S->DB + (*(watch++) >> 1);
     if (_clause == clause) {
@@ -118,7 +123,9 @@ static inline void addDependency (struct solver* S, int dep, int forced) {
   if (S->traceFile || S->lratFile) {
     if (S->nDependencies == S->maxDependencies) {
       S->maxDependencies = (S->maxDependencies * 3) >> 1;
-      S->dependencies = realloc (S->dependencies, sizeof (int) * S->maxDependencies); }
+      printf ("c dependencies increased to %i\n", S->maxDependencies);
+      S->dependencies = realloc (S->dependencies, sizeof (int) * S->maxDependencies);
+      if (S->dependencies == NULL) { printf ("c MEMOUT: dependencies reallocation failed\n"); exit (0); } }
     S->dependencies[S->nDependencies++] = (dep << 1) + forced; } }
 
 static inline void markClause (struct solver* S, int* clause, int index) {
@@ -155,7 +162,7 @@ void analyze (struct solver* S, int* clause, int index) {     // Mark all clause
   S->processed = S->assigned = S->forced; }
 
 int propagate (struct solver* S, int init) {        // Performs unit propagation
-  int **start = (int**) malloc (sizeof(int*) * 2);
+  int *start[2];
   int check = 0, mode = !S->prep;
   int i, lit, _lit = 0; long *watch, *_watch;
   start[0] = start[1] = S->processed;
@@ -251,7 +258,8 @@ void printProof (struct solver *S) {
   if (S->mode == BACKWARD_UNSAT) {
     if (S->nOpt > S->nAlloc) {
       S->nAlloc = S->nOpt;
-      S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc); }
+      S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc);
+      if (S->proof == NULL) { printf("c MEMOUT: reallocation of proof list failed\n"); exit (0); } }
     S->nStep   = 0;
     S->nLemmas = 0;
     for (step = S->nOpt - 1; step >= 0; step--) {
@@ -350,7 +358,8 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
     int i, j, k;
     if (clause != NULL) {
       int size = 0;
-      int sortClause[S->maxSize];
+      int *sortClause;
+      sortClause = (int *) malloc (sizeof(int) * S->maxSize);
       fprintf (file, "%lu ", S->time >> 1);
       int reslit = clause[PIVOT];
       while (*clause) {
@@ -429,7 +438,8 @@ int checkRAT (struct solver *S, int pivot) {
               continue; }
 	    if (nRAT == S->maxRAT) {
 	      S->maxRAT = (S->maxRAT * 3) >> 1;
-	      S->RATset = realloc (S->RATset, sizeof (int) * S->maxRAT); }
+	      S->RATset = realloc (S->RATset, sizeof (int) * S->maxRAT);
+              assert (S->RATset != NULL); }
 	    S->RATset[nRAT++] = S->wlist[i][j] >> 1;
             break; } } } }
 
@@ -987,13 +997,17 @@ int parse (struct solver* S) {
             hashUsed[hash]--;
             active--;
             if (S->nStep == S->nAlloc) { S->nAlloc = (S->nAlloc * 3) >> 1;
-              S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc); }
+              S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc);
+              printf ("c proof allocation increased to %li\n", S->nAlloc);
+              if (S->proof == NULL) { printf("c MEMOUT: reallocation of proof list failed\n"); exit (0); } }
             S->proof[S->nStep++] = (match << INFOBITS) + 1; }
         end_delete:;
         if (del) { del = 0; size = 0; continue; } }
 
       if (S->mem_used + size + EXTRA > DBsize) { DBsize = (DBsize * 3) >> 1;
-	S->DB = (int *) realloc (S->DB, DBsize * sizeof (int)); }
+	S->DB = (int *) realloc (S->DB, DBsize * sizeof (int));
+        printf("c database increased to %li\n", DBsize);
+        if (S->DB == NULL) { printf("c MEMOUT: reallocation of clause database failed\n"); exit (0); } }
       int *clause = &S->DB[S->mem_used + EXTRA - 1];
       if (size != 0) clause[PIVOT] = pivot;
       clause[ID] = 2 * S->count; S->count++;
@@ -1004,7 +1018,8 @@ int parse (struct solver* S) {
 
       hash = getHash (clause);
       if (hashUsed[hash] == hashMax[hash]) { hashMax[hash] = (hashMax[hash] * 3) >> 1;
-        hashTable[hash] = (long *) realloc (hashTable[hash], sizeof (long*) * hashMax[hash]); }
+        hashTable[hash] = (long *) realloc (hashTable[hash], sizeof (long*) * hashMax[hash]);
+        if (hashTable[hash] == NULL) { printf("c MEMOUT reallocation of hash table %i failed\n", hash); exit (0); } }
       hashTable[ hash ][ hashUsed[hash]++ ] = (long) (clause - S->DB);
 
       active++;
@@ -1012,7 +1027,9 @@ int parse (struct solver* S) {
         S->formula[S->nClauses - nZeros] = (((long) (clause - S->DB)) << INFOBITS); }
       else {
         if (S->nStep == S->nAlloc) { S->nAlloc = (S->nAlloc * 3) >> 1;
-          S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc); }
+          S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc);
+        printf ("c proof allocation increased to %li\n", S->nAlloc);
+        if (S->proof == NULL) { printf("c MEMOUT: reallocation of proof list failed\n"); exit (0); } }
         S->proof[S->nStep++] = (((long) (clause - S->DB)) << INFOBITS); }
 
       if (nZeros <= 0) S->nLemmas++;
@@ -1035,7 +1052,9 @@ int parse (struct solver* S) {
         int *clause = S->DB + hashTable [i][j];
         printClause (clause);
         if (S->nStep == S->nAlloc) { S->nAlloc = (S->nAlloc * 3) >> 1;
-            S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc); }
+          S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc);
+          printf ("c proof allocation increased to %li\n", S->nAlloc);
+          if (S->proof == NULL) { printf("c MEMOUT: reallocation of proof list failed\n"); exit (0); } }
         S->proof[S->nStep++] = (((int) (clause - S->DB)) << INFOBITS) + 1; } } }
 
   S->DB = (int *) realloc (S->DB, S->mem_used * sizeof (int));
@@ -1049,11 +1068,11 @@ int parse (struct solver* S) {
   printf ("\rc finished parsing\n");
 
   int n = S->maxVar;
-  S->falseStack = (int *) malloc ((    n + 1) * sizeof (int )); // Stack of falsified literals -- this pointer is never changed
-  S->reason     = (long*) malloc ((    n + 1) * sizeof (long)); // Array of clauses
-  S->used       = (int *) malloc ((2 * n + 1) * sizeof (int )); S->used  += n; // Labels for variables, non-zero means false
-  S->max        = (int *) malloc ((2 * n + 1) * sizeof (int )); S->max   += n; // Labels for variables, non-zero means false
-  S->false      = (int *) malloc ((2 * n + 1) * sizeof (int )); S->false += n; // Labels for variables, non-zero means false
+  S->falseStack = (int  *) malloc ((    n + 1) * sizeof (int )); // Stack of falsified literals -- this pointer is never changed
+  S->reason     = (long *) malloc ((    n + 1) * sizeof (long)); // Array of clauses
+  S->used       = (int  *) malloc ((2 * n + 1) * sizeof (int )); S->used  += n; // Labels for variables, non-zero means false
+  S->max        = (int  *) malloc ((2 * n + 1) * sizeof (int )); S->max   += n; // Labels for variables, non-zero means false
+  S->false      = (int  *) malloc ((2 * n + 1) * sizeof (int )); S->false += n; // Labels for variables, non-zero means false
 
   S->optproof   = (long *) malloc (sizeof(long) * (2 * S->nLemmas + S->nClauses));
 
