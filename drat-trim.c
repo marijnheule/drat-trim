@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
-Copyright (c) 2015-2016 Marijn Heule, The University of Texas at Austin.
-Last edit, February 25, 2017
+Copyright (c) 2015-2017 Marijn Heule, The University of Texas at Austin.
+Last edit, June 17, 2017
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -73,7 +73,7 @@ static inline void printClause (int* clause) {
 static inline void addWatchPtr (struct solver* S, int lit, long watch) {
   if (S->used[lit] + 1 == S->max[lit]) { S->max[lit] *= 1.5;
     S->wlist[lit] = (long *) realloc (S->wlist[lit], sizeof (long) * S->max[lit]);
-    if (S->max[lit] > 1000) printf("c watchlist %i increased to %i\n", lit, S->max[lit]);
+//    if (S->max[lit] > 1000) printf("c watchlist %i increased to %i\n", lit, S->max[lit]);
     if (S->wlist[lit] == NULL) { printf("c MEMOUT: reallocation failed for watch list of %i\n", lit); exit (0); } }
   S->wlist[lit][ S->used[lit]++ ] = watch | S->mask;
   S->wlist[lit][ S->used[lit]   ] = END; }
@@ -123,7 +123,7 @@ static inline void addDependency (struct solver* S, int dep, int forced) {
   if (S->traceFile || S->lratFile) {
     if (S->nDependencies == S->maxDependencies) {
       S->maxDependencies = (S->maxDependencies * 3) >> 1;
-      printf ("c dependencies increased to %i\n", S->maxDependencies);
+//      printf ("c dependencies increased to %i\n", S->maxDependencies);
       S->dependencies = realloc (S->dependencies, sizeof (int) * S->maxDependencies);
       if (S->dependencies == NULL) { printf ("c MEMOUT: dependencies reallocation failed\n"); exit (0); } }
     S->dependencies[S->nDependencies++] = (dep << 1) + forced; } }
@@ -998,7 +998,7 @@ int parse (struct solver* S) {
             active--;
             if (S->nStep == S->nAlloc) { S->nAlloc = (S->nAlloc * 3) >> 1;
               S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc);
-              printf ("c proof allocation increased to %li\n", S->nAlloc);
+//              printf ("c proof allocation increased to %li\n", S->nAlloc);
               if (S->proof == NULL) { printf("c MEMOUT: reallocation of proof list failed\n"); exit (0); } }
             S->proof[S->nStep++] = (match << INFOBITS) + 1; }
         end_delete:;
@@ -1006,7 +1006,7 @@ int parse (struct solver* S) {
 
       if (S->mem_used + size + EXTRA > DBsize) { DBsize = (DBsize * 3) >> 1;
 	S->DB = (int *) realloc (S->DB, DBsize * sizeof (int));
-        printf("c database increased to %li\n", DBsize);
+//        printf("c database increased to %li\n", DBsize);
         if (S->DB == NULL) { printf("c MEMOUT: reallocation of clause database failed\n"); exit (0); } }
       int *clause = &S->DB[S->mem_used + EXTRA - 1];
       if (size != 0) clause[PIVOT] = pivot;
@@ -1028,7 +1028,7 @@ int parse (struct solver* S) {
       else {
         if (S->nStep == S->nAlloc) { S->nAlloc = (S->nAlloc * 3) >> 1;
           S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc);
-        printf ("c proof allocation increased to %li\n", S->nAlloc);
+//        printf ("c proof allocation increased to %li\n", S->nAlloc);
         if (S->proof == NULL) { printf("c MEMOUT: reallocation of proof list failed\n"); exit (0); } }
         S->proof[S->nStep++] = (((long) (clause - S->DB)) << INFOBITS); }
 
@@ -1053,7 +1053,7 @@ int parse (struct solver* S) {
         printClause (clause);
         if (S->nStep == S->nAlloc) { S->nAlloc = (S->nAlloc * 3) >> 1;
           S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc);
-          printf ("c proof allocation increased to %li\n", S->nAlloc);
+//          printf ("c proof allocation increased to %li\n", S->nAlloc);
           if (S->proof == NULL) { printf("c MEMOUT: reallocation of proof list failed\n"); exit (0); } }
         S->proof[S->nStep++] = (((int) (clause - S->DB)) << INFOBITS) + 1; } } }
 
