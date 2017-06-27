@@ -1,17 +1,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int write_lit (FILE *output, int lit) {
-  unsigned int l = abs (lit) << 1;
-  if (lit < 0) l++;
+#define EMPTY	-1
 
-  do {
-    if (l <= 127) { fputc ((char)                 l, output); }
-    else          { fputc ((char) (128 + (l & 127)), output); }
-    l = l >> 7;
-  } while (l);
+int table_size, table_alloc, lookup_size, lookup_alloc, *table, *lookup;
 
-  return 1; }
+void write_lit (FILE *output, int lit, int sort) {
+  if (sort == 0) {
+    unsigned int l = abs (lit) << 1;
+    if (lit < 0) l++;
+
+    do {
+      if (l <= 127) { fputc ((char)                 l, output); }
+      else          { fputc ((char) (128 + (l & 127)), output); }
+      l = l >> 7;
+    } while (l); }
+  else {
+    if (table_size >= table_alloc) {
+      table_alloc = (table_alloc * 3) >> 1;
+      table = (int*) realloc (table, sizeof(int) * table_alloc); }
+    table[ table_size++ ] = lit; }
+}
 
 int main (int argc, char** argv) {
 
@@ -22,7 +31,17 @@ int main (int argc, char** argv) {
   FILE *input  = fopen (argv[1], "r");
   FILE *output = fopen (argv[2], "w");
 
-  int tmp, line, lit, del, size = 0;
+  int i, tmp, line, lit, del, size = 0;
+  int sort = 1;
+
+  if (sort) {
+    lookup_size  =    0;
+    lookup_alloc = 1000;
+    lookup = (int*) malloc (sizeof (int) * lookup_alloc);
+    for (i = 0; i < lookup_alloc; i++) lookup[i] = EMPTY;
+    table_size   =    0;
+    table_alloc  = 1000;
+    table = (int*) malloc (sizeof (int) * table_alloc); }
 
   while (1) {
     tmp = fscanf (input ," %i ", &line);
@@ -35,14 +54,33 @@ int main (int argc, char** argv) {
       size++; }
 
     if (size == 2) {
-      if (del == 0) { fputc ('a', output); write_lit (output, line); write_lit (output, lit); }
-      else          { fputc ('d', output); write_lit (output, lit); if (lit == 0) size = 0; } }
+      if (sort == 1) {
+        int entry = 2 * line + del;
+        if (entry >  lookup_size) lookup_size = entry;
+        if (entry >= lookup_alloc) {
+          int old = lookup_alloc;
+          lookup_alloc = 3 * entry >> 1;
+          lookup = (int*) realloc (lookup, sizeof (int) * lookup_alloc);
+          for (i = old; i < lookup_alloc; i++) lookup[i] = EMPTY; }
+        lookup[entry] = table_size; }
+      if (del == 0) { if (sort == 0) fputc ('a', output); write_lit (output, line, sort); write_lit (output, lit, sort); }
+      else          { if (sort == 0) fputc ('d', output); write_lit (output, lit,  sort); if (lit == 0) size = 0; } }
 
-    if (size > 2) write_lit (output, line);
+    if (size > 2) write_lit (output, line, sort);
 
     if (line == 0 && del == 1) size = 0;
     if (line == 0 && del == 0) del  = 1; }
+  fclose (input);
+  if (sort == 0) return 1;
 
-  close (input);
-  return 1;
+  for (i = 0; i <= lookup_size; i++) {
+    int zeros = 0;
+    if (lookup[i] == EMPTY) continue;
+    if (i % 2) { fputc ('d', output); zeros = 1; }
+    else       { fputc ('a', output); zeros = 2; }
+    int *list = table + lookup[i];
+    while (zeros) {
+      while (*list) write_lit (output, *list++, 0);
+      write_lit (output, *list++, 0);
+      zeros--; } }
 }
