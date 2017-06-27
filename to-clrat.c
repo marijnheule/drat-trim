@@ -47,6 +47,7 @@ int main (int argc, char** argv) {
     tmp = fscanf (input ," %i ", &line);
     if (tmp == EOF) break;
     if (tmp) size++;
+//    printf("%i (%i) ", size, line);
     if (size == 1) {
       tmp = fscanf (input, " %i ", &lit);
       if (tmp == 1) { del = 0; }
@@ -62,8 +63,9 @@ int main (int argc, char** argv) {
           lookup_alloc = 3 * entry >> 1;
           lookup = (int*) realloc (lookup, sizeof (int) * lookup_alloc);
           for (i = old; i < lookup_alloc; i++) lookup[i] = EMPTY; }
+//        printf("c adding entry %i (%i, %i, %i, %i)\n", entry, line, lit, del, size);
         lookup[entry] = table_size; }
-      if (del == 0) { if (sort == 0) fputc ('a', output); write_lit (output, line, sort); write_lit (output, lit, sort); }
+      if (del == 0) { if (sort == 0) fputc ('a', output); write_lit (output, line, sort); write_lit (output, lit, sort); if (lit == 0) del = 1; }
       else          { if (sort == 0) fputc ('d', output); write_lit (output, lit,  sort); if (lit == 0) size = 0; } }
 
     if (size > 2) write_lit (output, line, sort);
@@ -73,9 +75,10 @@ int main (int argc, char** argv) {
   fclose (input);
   if (sort == 0) return 1;
 
-  for (i = 0; i <= lookup_size; i++) {
+  for (i = 1; i <= lookup_size; i++) {
     int zeros = 0;
     if (lookup[i] == EMPTY) continue;
+//    printf ("c printing line %i\n", i);
     if (i % 2) { fputc ('d', output); zeros = 1; }
     else       { fputc ('a', output); zeros = 2; }
     int *list = table + lookup[i];
