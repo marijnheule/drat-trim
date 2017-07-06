@@ -20,6 +20,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #define DELETED		-1
 #define SUCCESS		1
@@ -58,6 +59,7 @@ int checkRedundancy (int pivot, int start, int *hints, long long thisMask) {
     int flag = 0, *clause = table + clsList[res];
     while (*clause) {
       int clit = convertLit (*clause++);
+//      assert (clit < maskAlloc);
       if (clit == (pivot^1)) { flag = 1; continue; }
       if (mask[clit  ] >= thisMask) continue;       // lit is falsified
       if (mask[clit^1] >= thisMask) return SUCCESS; // blocked
@@ -69,6 +71,7 @@ int checkRedundancy (int pivot, int start, int *hints, long long thisMask) {
     int unit = 0, *clause = table + clsList[*hints++];
     while (*clause) {
       int clit = convertLit (*clause++);
+//      assert (clit < maskAlloc);
       if (mask[clit] >= thisMask) continue; // lit is falsified
       if (unit != 0) return FAILED;
       unit = clit; }
@@ -84,9 +87,11 @@ int checkClause (int* list, int size, int* hints) {
   int RATs = getRATs (hints + 1);
   for (i = 0; i < size; i++) {
     int clit = convertLit (list[i]);
-    if (clit > maskAlloc) {
+    if (clit >= maskAlloc) {
       maskAlloc = (clit * 3) >> 1;
-      mask = (long long *) realloc (mask, sizeof (long long) * maskAlloc); }
+      printf("c realloc mask to %i\n", maskAlloc);
+      mask = (long long *) realloc (mask, sizeof (long long) * maskAlloc);
+      if (mask == NULL) exit(0); }
     mask [clit] = now + RATs; }
 
   int res = checkRedundancy (pivot, 0, hints, now + RATs);
@@ -101,21 +106,23 @@ int checkClause (int* list, int size, int* hints) {
     start = abs(*hints) + 1; }
 
   while (start <= clsLast) {
-      if (clsList[start++] != DELETED) {
-        int *clause = table + clsList[start-1];
-        while (*clause) {
-          int clit = convertLit (*clause++);
-          if (clit == (pivot^1)) return FAILED; } } }
+    if (clsList[start++] != DELETED) {
+      int *clause = table + clsList[start-1];
+      while (*clause) {
+        int clit = convertLit (*clause++);
+        if (clit == (pivot^1)) return FAILED; } } }
 
   return SUCCESS; }
 
 void addClause (int index, int* literals, int size) {
   if (index >= clsAlloc) {
     clsAlloc = (index * 3) >> 1;
+    printf("c realloc mask clsList %i\n", clsAlloc);
     clsList = (int*) realloc (clsList, sizeof(int) * clsAlloc); }
 
   if (tableSize + size >= tableAlloc) {
     tableAlloc = (tableAlloc * 3) >> 1;
+    printf("c realloc table to %i\n", tableAlloc);
     table = (int*) realloc (table, sizeof (int) * tableAlloc); }
 
   clsList[index] = tableSize;
@@ -182,11 +189,10 @@ int main (int argc, char** argv) {
   while (1) {
     int size = parseLine (cnf, list, CNF);
     if (size == 0) break;
-//    printClause (list);
     addClause (index++, list, size); }
   fclose (cnf);
 
-  maskAlloc = 2 * nVar;
+  maskAlloc = 20 * nVar;
   mask = (long long*) malloc (sizeof(long long) * maskAlloc);
   int i; for (i = 0; i < maskAlloc; i++) mask[i] = 0;
 
@@ -194,7 +200,6 @@ int main (int argc, char** argv) {
   int mode = LRAT;
   while (1) {
     int size = parseLine (proof, list, mode);
-//    printClause (list);
     if (size == 0) break;
 
     if (getType (list) == (int) 'd') {
