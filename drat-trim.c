@@ -674,6 +674,7 @@ int verify (struct solver *S, int begin, int end) {
 
     int size = sortSize (S, lemmas); // after removal of watches
 
+
     if (d && S->mode == FORWARD_SAT) {
       if (size == -1) propagateUnits (S, 0);  // necessary?
       if (redundancyCheck (S, lemmas, size) == FAILED)  {
@@ -683,11 +684,12 @@ int verify (struct solver *S, int begin, int end) {
 
     if (d == 0 && S->mode == FORWARD_UNSAT) {
       if (step > end) {
-      if (redundancyCheck (S, lemmas, size) == FAILED) {
-        printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
-        return SAT; }
-      size = sortSize (S, lemmas);
-      S->nDependencies = 0; } }
+        if (size < 0) continue; // Fix of bus error: 10
+        if (redundancyCheck (S, lemmas, size) == FAILED) {
+          printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
+          return SAT; }
+        size = sortSize (S, lemmas);
+        S->nDependencies = 0; } }
 
     if (lemmas[1])
       addWatch (S, lemmas, 0), addWatch (S, lemmas, 1);
