@@ -84,7 +84,7 @@ int checkClause (int* list, int size, int* hints) {
   int RATs = getRATs (hints + 1);
   for (i = 0; i < size; i++) {
     int clit = convertLit (list[i]);
-    if (clit > maskAlloc) {
+    if (clit >= maskAlloc) {
       maskAlloc = (clit * 3) >> 1;
       mask = (long long *) realloc (mask, sizeof (long long) * maskAlloc); }
     mask [clit] = now + RATs; }
@@ -150,7 +150,7 @@ int parseLine (FILE* file, int *list, int mode) {
     if (tmp == 1) {
       list[count++] = (int) 'd';
       list[count++] = lit; zeros--;
-      if (lit == 0) zeros--;
+      if (lit   == 0) zeros--;
       if (zeros == 0) return count; }
     else { list[count++] = (int) 'a'; }
 
@@ -182,7 +182,6 @@ int main (int argc, char** argv) {
   while (1) {
     int size = parseLine (cnf, list, CNF);
     if (size == 0) break;
-//    printClause (list);
     addClause (index++, list, size); }
   fclose (cnf);
 
@@ -194,7 +193,6 @@ int main (int argc, char** argv) {
   int mode = LRAT;
   while (1) {
     int size = parseLine (proof, list, mode);
-//    printClause (list);
     if (size == 0) break;
 
     if (getType (list) == (int) 'd') {
