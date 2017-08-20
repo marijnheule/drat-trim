@@ -110,7 +110,8 @@ static inline void unassignUnit (struct solver* S, int lit) {
   while (S->false[-lit]) {
     if (S->verb)
       printf ("\rc removing unit %i (%i)\n", S->forced[-1], lit);
-    S->false[*(--S->forced)] = 0; }
+    S->false[*(--S->forced)] = 0;
+    S->reason[abs(*S->forced)] = 0; }
   S->processed = S->assigned = S->forced; }
 
 static inline void markWatch (struct solver* S, int* clause, int index, int offset) {
@@ -157,6 +158,7 @@ void analyze (struct solver* S, int* clause, int index) {     // Mark all clause
       while (*tmp != lit) tmp++;
       while (*tmp) { tmp[0] = tmp[1]; tmp++; }
       tmp[-1] = 0; }
+    if (S->assigned >= S->forced) S->reason[abs (lit)] = 0;
     S->false[lit] = (S->assigned < S->forced); }
 
   S->processed = S->assigned = S->forced; }
@@ -204,8 +206,10 @@ int propagate (struct solver* S, int init) {        // Performs unit propagation
 // Propagate top level units
 static inline int propagateUnits (struct solver* S, int init) {
   int i;
-  printf("c propagateUnits %i\n", S->unitSize);
-  while (S->forced > S->falseStack) { S->false[*(--S->forced)] = 0; }
+//  printf("c propagateUnits %i\n", S->unitSize);
+  while (S->forced > S->falseStack) {
+    S->false[*(--S->forced)] = 0;
+    S->reason[abs (*S->forced)] = 0; }
   S->forced = S->assigned = S->processed = S->falseStack;
   for (i = 0; i < S->unitSize; i++) {
     int lit = S->DB[ S->unitStack[i] ];
@@ -459,8 +463,6 @@ int checkRAT (struct solver *S, int pivot) {
     if (S->verb) {
       printf ("\rc RAT clause: "); printClause (RATcls); }
 
-//    if (id == 1169002) printClause (RATcls);
-
     while (*RATcls) {
       int lit = *RATcls++;
       if (lit != -pivot && S->false[-lit])
@@ -481,7 +483,9 @@ int checkRAT (struct solver *S, int pivot) {
     addDependency (S, -id, 1); }
 
   if (flag == 0) {
-    while (S->forced < S->assigned) S->false[*(--S->assigned)] = 0;
+    while (S->forced < S->assigned) {
+      S->false[*(--S->assigned)] = 0;
+      S->reason[abs (*S->assigned)] = 0; }
     if (S->verb) printf ("\rc RAT check on pivot %i failed\n", pivot);
     return FAILED; }
 
@@ -511,7 +515,9 @@ int redundancyCheck (struct solver *S, int *clause, int size) {
       if (S->warning != NOWARNING) {
         printf ("\rc WARNING: found a tautological clause in proof: "); printClause (clause); }
       if (S->warning == HARDWARNING) exit (HARDWARNING);
-      while (S->forced < S->assigned) S->false[*(--S->assigned)] = 0;
+      while (S->forced < S->assigned) {
+        S->false[*(--S->assigned)] = 0;
+        S->reason[abs (*S->assigned)] = 0; }
       return SUCCEED; }
     S->false[clause[i]] = ASSUMED;
     *(S->assigned++) = clause[i];
@@ -556,7 +562,9 @@ int redundancyCheck (struct solver *S, int *clause, int size) {
   printDependencies (S, clause, 1);
 
   S->processed = S->forced = savedForced;
-  while (S->forced < S->assigned) S->false[*(--S->assigned)] = 0;
+  while (S->forced < S->assigned) {
+    S->false[*(--S->assigned)] = 0;
+    S->reason[abs (*S->assigned)] = 0; }
 
   S->RATcount++;
   if (S->verb) printf ("\rc lemma has RAT on %i\n", clause[PIVOT]);
@@ -665,8 +673,9 @@ int verify (struct solver *S, int begin, int end) {
         else { addUnit (S, (long) (lemmas - S->DB)); } } }
 
     if (d && lemmas[1]) { // if delete and not unit
-      if ((S->reason[abs (lemmas[0])] - 1) == (lemmas - S->DB)) {
+      if ((S->reason[abs (lemmas[0])] - 1) == (lemmas - S->DB)) { // what is this check?
         if (S->mode != FORWARD_SAT) { // ignore pseudo unit clause deletion
+          if (S->verb) { printf ("c ignoring deletion intruction %i: ", (lemmas - S->DB)); printClause (lemmas); }
 //        if (S->mode == BACKWARD_UNSAT) { // ignore pseudo unit clause deletion
           S->proof[step] = 0; }
         else { // if (S->mode == FORWARD_SAT) { // also for FORWARD_UNSAT?
