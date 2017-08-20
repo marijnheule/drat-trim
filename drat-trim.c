@@ -161,7 +161,7 @@ void analyze (struct solver* S, int* clause, int index) {     // Mark all clause
 
   S->processed = S->assigned = S->forced; }
 
-int propagate (struct solver* S, int init) {        // Performs unit propagation
+int propagate (struct solver* S, int init) {        // Performs unit propagation (init not used?)
   int *start[2];
   int check = 0, mode = !S->prep;
   int i, lit, _lit = 0; long *watch, *_watch;
@@ -200,8 +200,11 @@ int propagate (struct solver* S, int init) {        // Performs unit propagation
   S->processed = S->assigned;
   return SAT; }	                                    // Finally, no conflict was found
 
+
+// Propagate top level units
 static inline int propagateUnits (struct solver* S, int init) {
   int i;
+  printf("c propagateUnits %i\n", S->unitSize);
   while (S->forced > S->falseStack) { S->false[*(--S->forced)] = 0; }
   S->forced = S->assigned = S->processed = S->falseStack;
   for (i = 0; i < S->unitSize; i++) {
@@ -456,7 +459,7 @@ int checkRAT (struct solver *S, int pivot) {
     if (S->verb) {
       printf ("\rc RAT clause: "); printClause (RATcls); }
 
-    if (id == 1169002) printClause (RATcls);
+//    if (id == 1169002) printClause (RATcls);
 
     while (*RATcls) {
       int lit = *RATcls++;
@@ -633,6 +636,7 @@ int verify (struct solver *S, int begin, int end) {
   if (S->mode == FORWARD_UNSAT) {
     if (begin == end)
       printf ("\rc start forward verification\n"); }
+
   int step;
   int adds = 0;
   int active = S->nClauses;
@@ -651,7 +655,7 @@ int verify (struct solver *S, int begin, int end) {
       if (S->verb)
         printf ("\rc found unit in proof %i [%li]\n", lit, S->time);
       if (d) {
-        if (S->mode != BACKWARD_UNSAT) {
+        if (S->mode == FORWARD_SAT) {
           removeUnit (S, lit); propagateUnits (S, 0); }
         else { // no need to remove units while checking UNSAT
           if (S->verb) { printf("c removing proof step: d "); printClause(lemmas); }
@@ -662,18 +666,18 @@ int verify (struct solver *S, int begin, int end) {
 
     if (d && lemmas[1]) { // if delete and not unit
       if ((S->reason[abs (lemmas[0])] - 1) == (lemmas - S->DB)) {
-        if (S->mode == BACKWARD_UNSAT) { // ignore pseudo unit clause deletion
+        if (S->mode != FORWARD_SAT) { // ignore pseudo unit clause deletion
+//        if (S->mode == BACKWARD_UNSAT) { // ignore pseudo unit clause deletion
           S->proof[step] = 0; }
         else { // if (S->mode == FORWARD_SAT) { // also for FORWARD_UNSAT?
           removeWatch (S, lemmas, 0), removeWatch (S, lemmas, 1);
           propagateUnits (S, 0); } }
       else {
         removeWatch (S, lemmas, 0), removeWatch (S, lemmas, 1); }
-      if (S->mode == FORWARD_UNSAT)  continue;
+      if (S->mode == FORWARD_UNSAT ) continue;   // Ignore deletion of top-level units
       if (S->mode == BACKWARD_UNSAT) continue; }
 
     int size = sortSize (S, lemmas); // after removal of watches
-
 
     if (d && S->mode == FORWARD_SAT) {
       if (size == -1) propagateUnits (S, 0);  // necessary?
@@ -688,6 +692,7 @@ int verify (struct solver *S, int begin, int end) {
         if (redundancyCheck (S, lemmas, size) == FAILED) {
           printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
           return SAT; }
+
         size = sortSize (S, lemmas);
         S->nDependencies = 0; } }
 
@@ -705,7 +710,7 @@ int verify (struct solver *S, int begin, int end) {
     postprocess (S); return UNSAT; }
 
   if (S->mode == FORWARD_UNSAT) {
-      if (begin == end) {
+    if (begin == end) {
       postprocess (S);
       printf ("\rc ERROR: all lemmas verified, but no conflict\n"); }
     return SAT; }
