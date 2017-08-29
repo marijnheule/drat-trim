@@ -57,7 +57,7 @@ struct solver { FILE *inputFile, *proofFile, *lratFile, *traceFile, *activeFile;
     char *coreStr, *lemmaStr;
     struct timeval start_time;
     long mem_used, time, nClauses, nStep, nOpt, nAlloc, *unitStack, *reason, lemmas, nResolve,
-         lratSize, lratAlloc, *lratLookup, **wlist, *optproof, *formula, *proof;  };
+         nReads, nWrites, lratSize, lratAlloc, *lratLookup, **wlist, *optproof, *formula, *proof;  };
 
 static inline void assign (struct solver* S, int lit) {
   S->false[-lit] = 1; *(S->assigned++) = -lit; }
@@ -259,13 +259,14 @@ void write_lit (struct solver *S, int lit) { // change to long?
   do {
     if (l <= 127) { fputc ((char)                 l, S->lratFile); }
     else          { fputc ((char) (128 + (l & 127)), S->lratFile); }
+    S->nWrites++;
     l = l >> 7; } 
   while (l); }
 
 void printLRATline (struct solver *S, int time) {
   int *line = S->lratTable + S->lratLookup[time];
 #ifdef COMPRESS
-  fputc ('a', S->lratFile);
+  fputc ('a', S->lratFile); S->nWrites++;
   while (*line) write_lit (S, *line++); 
   write_lit (S, *line++);
   while (*line) write_lit (S, *line++); 
@@ -342,7 +343,7 @@ void printProof (struct solver *S) {
       else if (ad & 1) {
         if (lastAdded != 0) { 
 //          fprintf (S->lratFile, "%i d ", lastAdded);
-          fputc ('d', S->lratFile); }
+          fputc ('d', S->lratFile); S->nWrites++; }
 //          fputc ('d', S->lratFile); write_lit (S, lastAdded); }
         lastAdded = 0;
         write_lit (S, lemmas[ID] >> 1); } }
@@ -352,12 +353,13 @@ void printProof (struct solver *S) {
       write_lit (S, 0); } 
     printLRATline (S, S->count);
   
-    fclose (S->lratFile); } }
+    fclose (S->lratFile); 
+    printf ("c wrote optimized proof in LRAT format of %li bytes\n", S->nWrites); } }
 
 
 void printNoCore (struct solver *S) {
   if (S->lratFile) { int i;
-    fputc ('d', S->lratFile); 
+    fputc ('d', S->lratFile); S->nWrites++;
 //    fprintf (S->lratFile, "%ld d ", S->nClauses);
     for (i = 0; i < S->nClauses; i++) {
       int *clause = S->DB + (S->formula[i] >> INFOBITS);
@@ -900,10 +902,11 @@ unsigned int getHash (int* input) {
     prod *= *input; sum += *input; xor ^= *input; input++; }
   return (1023 * sum + prod ^ (31 * xor)) % BIGINIT; }
 
-int read_lit (FILE *proofFile, int *lit) {
+int read_lit (struct solver *S, int *lit) {
   int l = 0, lc, shift = 0;
   do {
-    lc = getc_unlocked (proofFile);
+    lc = getc_unlocked (S->proofFile);
+    S->nReads++;
     if ((shift == 0) && (lc == EOF)) return EOF;
     l |= (lc & 127) << shift;
     shift += 7; }
@@ -997,7 +1000,8 @@ int parse (struct solver* S) {
           if      (res == EOF) break;
           else if (res ==  97) del = 0;
           else if (res == 100) del = 1;
-          else { printf ("\rc ERROR: wrong binary prefix\n"); exit (0); } }
+          else { printf ("\rc ERROR: wrong binary prefix\n"); exit (0); }
+          S->nReads++; }
         else {
           tmp = fscanf (S->proofFile, " d  %i ", &lit);
           if (tmp == EOF) break;
@@ -1007,7 +1011,7 @@ int parse (struct solver* S) {
       if (!fileSwitchFlag) tmp = fscanf (S->inputFile, " %i ", &lit);  // Read a literal.
       else {
         if (S->binMode) {
-          tmp = read_lit (S->proofFile, &lit); }
+          tmp = read_lit (S, &lit); }
         else {
           tmp = fscanf (S->proofFile, " %i ", &lit); } }
       if (tmp == EOF && !fileSwitchFlag) {
@@ -1139,7 +1143,9 @@ int parse (struct solver* S) {
   free (hashMax);
   free (buffer);
 
-  printf ("\rc finished parsing\n");
+  printf ("\rc finished parsing");
+  if (S->nReads) printf (", read %li bytes from proof file", S->nReads);
+  printf ("\n");
 
   int n = S->maxVar;
   S->falseStack = (int  *) malloc ((    n + 1) * sizeof (int )); // Stack of falsified literals -- this pointer is never changed
@@ -1239,6 +1245,8 @@ int main (int argc, char** argv) {
   S.lratFile   = NULL;
   S.traceFile  = NULL;
   S.timeout    = TIMEOUT;
+  S.nReads     = 0;
+  S.nWrites    = 0;
   S.mask       = 0;
   S.verb       = 0;
   S.backforce  = 0;
