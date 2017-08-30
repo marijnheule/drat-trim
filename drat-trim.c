@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
 Copyright (c) 2015-2017 Marijn Heule, The University of Texas at Austin.
-Last edit, June 17, 2017
+Last edit, August 30, 2017
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -50,10 +50,10 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define COMPRESS
 
 struct solver { FILE *inputFile, *proofFile, *lratFile, *traceFile, *activeFile;
-    int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode, optimize,
+    int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode, optimize, binOutput,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, nActive, *lratTable,
       nLemmas, maxRAT, *RATset, *preRAT, maxDependencies, nDependencies, bar, backforce, reduce,
-      *dependencies, maxVar, maxSize, mode, verb, unitSize, prep, *current, nRemoved, warning;
+      *dependencies, maxVar, maxSize, mode, verb, unitSize, prep, *current, nRemoved, warning, delProof;
     char *coreStr, *lemmaStr;
     struct timeval start_time;
     long mem_used, time, nClauses, nStep, nOpt, nAlloc, *unitStack, *reason, lemmas, nResolve,
@@ -265,18 +265,17 @@ void write_lit (struct solver *S, int lit) { // change to long?
 
 void printLRATline (struct solver *S, int time) {
   int *line = S->lratTable + S->lratLookup[time];
-#ifdef COMPRESS
-  fputc ('a', S->lratFile); S->nWrites++;
-  while (*line) write_lit (S, *line++); 
-  write_lit (S, *line++);
-  while (*line) write_lit (S, *line++); 
-  write_lit (S, *line++); }
-#else
-  while (*line) fprintf (S->lratFile, "%i ", *line++);
-  fprintf (S->lratFile, "%i ", *line++);
-  while (*line) fprintf (S->lratFile, "%i ", *line++);
-  fprintf (S->lratFile, "%i\n", *line++); }
-#endif
+  if (S->binOutput) {
+    fputc ('a', S->lratFile); S->nWrites++;
+    while (*line) write_lit (S, *line++); 
+    write_lit (S, *line++);
+    while (*line) write_lit (S, *line++); 
+    write_lit (S, *line++); }
+  else {
+    while (*line) fprintf (S->lratFile, "%i ", *line++);
+    fprintf (S->lratFile, "%i ", *line++);
+    while (*line) fprintf (S->lratFile, "%i ", *line++);
+    fprintf (S->lratFile, "%i\n", *line++); } }
 
 // print the core lemmas to lemmaFile in DRAT format
 void printProof (struct solver *S) {
@@ -333,41 +332,55 @@ void printProof (struct solver *S) {
       int *lemmas = S->DB + (ad >> INFOBITS);
       if ((ad & 1) == 0) {
         if (lastAdded == 0) {
-//          fprintf (S->lratFile, "0\n");
-          write_lit (S, 0);
-        }
+          if (S->binOutput) {
+            write_lit (S, 0); }
+          else {
+            fprintf (S->lratFile, "0\n"); } }
         lastAdded = lemmas[ID] >> 1;
         printLRATline (S, lastAdded); }
       else if (lastAdded == S->nClauses) continue;
       else if (!lemmas[1] && (ad & 1)) continue; // don't delete unit clauses
       else if (ad & 1) {
-        if (lastAdded != 0) { 
-//          fprintf (S->lratFile, "%i d ", lastAdded);
-          fputc ('d', S->lratFile); S->nWrites++; }
-//          fputc ('d', S->lratFile); write_lit (S, lastAdded); }
+        if (lastAdded != 0) {
+          if (S->binOutput) {
+            fputc ('d', S->lratFile); S->nWrites++; }
+          else {
+            fprintf (S->lratFile, "%i d ", lastAdded); } }
         lastAdded = 0;
-        write_lit (S, lemmas[ID] >> 1); } }
-//        fprintf (S->lratFile, "%i ", lemmas[ID] >> 1); } }
+        if (S->binOutput) {
+          write_lit (S, lemmas[ID] >> 1); }
+        else {
+          fprintf (S->lratFile, "%i ", lemmas[ID] >> 1); } } }
     if (lastAdded != S->nClauses) {
-//      fprintf(S->lratFile, "0\n");
-      write_lit (S, 0); } 
+      if (S->binOutput) {
+        write_lit (S, 0); } 
+      else {
+        fprintf(S->lratFile, "0\n"); } }
+
     printLRATline (S, S->count);
   
-    fclose (S->lratFile); 
-    printf ("c wrote optimized proof in LRAT format of %li bytes\n", S->nWrites); } }
-
+    fclose (S->lratFile);
+    if (S->nWrites)
+      printf ("c wrote optimized proof in LRAT format of %li bytes\n", S->nWrites); } }
 
 void printNoCore (struct solver *S) {
-  if (S->lratFile) { int i;
-    fputc ('d', S->lratFile); S->nWrites++;
-//    fprintf (S->lratFile, "%ld d ", S->nClauses);
+  if (S->lratFile) {
+    if (S->binOutput) {
+      fputc ('d', S->lratFile); S->nWrites++; }
+    else {
+      fprintf (S->lratFile, "%ld d ", S->nClauses); }
+    int i;
     for (i = 0; i < S->nClauses; i++) {
       int *clause = S->DB + (S->formula[i] >> INFOBITS);
-      if ((clause[ID] & ACTIVE) == 0)
-        write_lit (S, clause[ID] >> 1); }
-//        fprintf (S->lratFile, "%i ", clause[ID] >> 1); }
-    write_lit (S, 0); } }
-//    fprintf (S->lratFile, "0\n"); } }
+      if ((clause[ID] & ACTIVE) == 0) {
+        if (S->binOutput) {
+          write_lit (S, clause[ID] >> 1); }
+        else {
+          fprintf (S->lratFile, "%i ", clause[ID] >> 1); } } }
+    if (S->binOutput) {
+      write_lit (S, 0); }
+    else {
+      fprintf (S->lratFile, "0\n"); } } }
 
 // print the dependency graph to traceFile in TraceCheck+ format
 // this procedure adds the active clauses at the end of the trace
@@ -413,7 +426,7 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
 
   if (file) {
     int i, j, k;
-    int line[1024];
+    int line[10240];
     int lsize = 0;
 
     if (clause != NULL) {
@@ -1224,6 +1237,8 @@ void printHelp ( ) {
   printf ("  -v          more verbose output\n");
   printf ("  -b          show progress bar\n");
   printf ("  -O          optimize proof till fixpoint by repeating verification\n");
+  printf ("  -C          compress core lemmas (emit binary proof)\n");
+  printf ("  -D          delete proof file after parsing\n");
   printf ("  -w          suppress warning messages\n");
   printf ("  -W          exit after first warning\n");
   printf ("  -p          run in plain mode (i.e., ignore deletion information)\n\n");
@@ -1249,6 +1264,7 @@ int main (int argc, char** argv) {
   S.nWrites    = 0;
   S.mask       = 0;
   S.verb       = 0;
+  S.delProof   = 0;
   S.backforce  = 0;
   S.optimize   = 0;
   S.warning    = 0;
@@ -1258,6 +1274,7 @@ int main (int argc, char** argv) {
   S.delete     = 1;
   S.reduce     = 1;
   S.binMode    = 0;
+  S.binOutput  = 0;
   gettimeofday (&S.start_time, NULL);
 
   int i, tmp = 0;
@@ -1273,6 +1290,8 @@ int main (int argc, char** argv) {
       else if (argv[i][1] == 'b') S.bar        = 1;
       else if (argv[i][1] == 'B') S.backforce  = 1;
       else if (argv[i][1] == 'O') S.optimize   = 1;
+      else if (argv[i][1] == 'C') S.binOutput  = 1;
+      else if (argv[i][1] == 'D') S.delProof   = 1;
       else if (argv[i][1] == 'u') S.mask       = 1;
       else if (argv[i][1] == 'v') S.verb       = 1;
       else if (argv[i][1] == 'w') S.warning    = NOWARNING;
@@ -1312,6 +1331,11 @@ int main (int argc, char** argv) {
 
   fclose (S.inputFile);
   fclose (S.proofFile);
+
+  if (S.delProof && argv[2] != NULL) {
+    int ret = remove(argv[2]);
+    if (ret == 0) printf("c deleted proof %s\n", argv[2]); }
+
   int sts = ERROR;
   if       (parseReturnValue == ERROR)          printf ("\rs MEMORY ALLOCATION ERROR\n");
   else if  (parseReturnValue == UNSAT)          printf ("\rc trivial UNSAT\ns VERIFIED\n");
