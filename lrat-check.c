@@ -89,7 +89,7 @@ int checkClause (int* list, int size, int* hints) {
     int clit = convertLit (list[i]);
     if (clit >= maskAlloc) {
       maskAlloc = (clit * 3) >> 1;
-      printf("c realloc mask to %i\n", maskAlloc);
+//      printf("c realloc mask to %i\n", maskAlloc);
       mask = (long long *) realloc (mask, sizeof (long long) * maskAlloc);
       if (mask == NULL) exit(0); }
     mask [clit] = now + RATs; }
@@ -117,12 +117,12 @@ int checkClause (int* list, int size, int* hints) {
 void addClause (int index, int* literals, int size) {
   if (index >= clsAlloc) {
     clsAlloc = (index * 3) >> 1;
-    printf("c realloc mask clsList %i\n", clsAlloc);
+//    printf("c realloc mask clsList %i\n", clsAlloc);
     clsList = (int*) realloc (clsList, sizeof(int) * clsAlloc); }
 
   if (tableSize + size >= tableAlloc) {
     tableAlloc = (tableAlloc * 3) >> 1;
-    printf("c realloc table to %i\n", tableAlloc);
+//    printf("c realloc table to %i\n", tableAlloc);
     table = (int*) realloc (table, sizeof (int) * tableAlloc); }
 
   clsList[index] = tableSize;
@@ -173,9 +173,16 @@ int parseLine (FILE* file, int *list, int mode) {
 int main (int argc, char** argv) {
   now = 0, clsLast = 0;
 
-  int nVar, nCls;
+  int nVar = 0, nCls = 0;
+  char ignore[1024];
   FILE* cnf   = fopen (argv[1], "r");
-  fscanf (cnf, " p cnf %i %i ", &nVar, &nCls);
+  for (;;) {
+    fscanf (cnf, " p cnf %i %i ", &nVar, &nCls);
+    if (nVar > 0) break;
+    fgets (ignore, sizeof (ignore), cnf);
+    int j; for (j = 0; j < 1024; j++) { if (ignore[j] == '\n') break; }
+    if (j == 1024) {
+      printf ("c ERROR: comment longer than 1024 characters: %s\n", ignore); exit (0); } }
 
   clsAlloc = nCls * 2;
   clsList  = (int*) malloc (sizeof(int) * clsAlloc);
@@ -191,6 +198,8 @@ int main (int argc, char** argv) {
     if (size == 0) break;
     addClause (index++, list, size); }
   fclose (cnf);
+
+  printf ("c parsed a formula with %i variables and %i clauses\n", nVar, nCls);
 
   maskAlloc = 20 * nVar;
   mask = (long long*) malloc (sizeof(long long) * maskAlloc);

@@ -260,16 +260,16 @@ void write_lit (struct solver *S, int lit) { // change to long?
     if (l <= 127) { fputc ((char)                 l, S->lratFile); }
     else          { fputc ((char) (128 + (l & 127)), S->lratFile); }
     S->nWrites++;
-    l = l >> 7; } 
+    l = l >> 7; }
   while (l); }
 
 void printLRATline (struct solver *S, int time) {
   int *line = S->lratTable + S->lratLookup[time];
   if (S->binOutput) {
     fputc ('a', S->lratFile); S->nWrites++;
-    while (*line) write_lit (S, *line++); 
+    while (*line) write_lit (S, *line++);
     write_lit (S, *line++);
-    while (*line) write_lit (S, *line++); 
+    while (*line) write_lit (S, *line++);
     write_lit (S, *line++); }
   else {
     while (*line) fprintf (S->lratFile, "%i ", *line++);
@@ -353,12 +353,12 @@ void printProof (struct solver *S) {
           fprintf (S->lratFile, "%i ", lemmas[ID] >> 1); } } }
     if (lastAdded != S->nClauses) {
       if (S->binOutput) {
-        write_lit (S, 0); } 
+        write_lit (S, 0); }
       else {
         fprintf(S->lratFile, "0\n"); } }
 
     printLRATline (S, S->count);
-  
+
     fclose (S->lratFile);
     if (S->nWrites)
       printf ("c wrote optimized proof in LRAT format of %li bytes\n", S->nWrites); } }
@@ -417,7 +417,7 @@ void lratAdd (struct solver *S, int elem) {
   if (S->lratSize == S->lratAlloc) {
     S->lratAlloc = S->lratAlloc * 3 >> 1;
     S->lratTable = (int *) realloc (S->lratTable, sizeof (int) * S->lratAlloc); }
-  S->lratTable[S->lratSize++] = elem; } 
+  S->lratTable[S->lratSize++] = elem; }
 
 void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode) {
   FILE *file = NULL;
@@ -426,30 +426,29 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
 
   if (file) {
     int i, j, k;
-    int line[10240];
-    int lsize = 0;
+    int tmp = S->lratSize;
 
     if (clause != NULL) {
            S->lratLookup[clause[ID] >> 1] = S->lratSize; }
-    else { S->lratLookup[S->count] = S->lratSize;   } 
+    else { S->lratLookup[S->count] = S->lratSize;   }
 
     if (clause != NULL) {
       int size = 0;
       int *sortClause;
       sortClause = (int *) malloc (sizeof(int) * S->maxSize);
-      line[lsize++] = (int) (S->time >> 1); // NB: long to int
+      lratAdd (S, S->time >> 1); // NB: long to ing
       int reslit = clause[PIVOT];
       while (*clause) {
         if (*clause == reslit)
-          line[lsize++] = reslit;
+          lratAdd (S, reslit);
         sortClause[size++] = *clause++; }
       qsort (sortClause, size, sizeof (int), abscompare);
       for (i = 0; i < size; i++) {
         int lit = sortClause[i];
         if (lit != reslit)
-          line[lsize++] = lit; } }
-    else { line[lsize++] = S->count; }
-    line[lsize++] = 0;
+          lratAdd (S, lit); } }
+    else { lratAdd (S, S->count); }
+    lratAdd (S, 0);
 
     int isRUP = 1;
     for (i = 0; i < S->nDependencies; i++)
@@ -457,8 +456,8 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
 
     if (isRUP) {
       for (i = S->nDependencies - 1; i >= 0; i--)
-        line[lsize++] = S->dependencies[i] >> 1;
-      line[lsize++] = 0;
+        lratAdd (S, S->dependencies[i] >> 1);
+      lratAdd (S, 0);
       goto printLine; }
 
     // first print the preRAT units in order of becoming unit
@@ -473,7 +472,7 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
           if (S->preRAT[k] == cls) flag = 1;
         if (!flag) {
           S->preRAT[size++] = cls;
-          line[lsize++] = cls >> 1; } } }
+          lratAdd (S, cls >> 1); } } }
 
     // print dependencies in order of becoming unit
     for (i = S->nDependencies - 1; i >= 0; i--) {
@@ -485,16 +484,17 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
           if (S->preRAT[j] == cls) flag = 1;
         if (!flag) {
           S->preRAT[size++] = cls;
-          line[lsize++] = cls >> 1; } }
+          lratAdd (S, cls >> 1); } }
       if ((mode == 1) && (cls & 1))
-        line[lsize++] = cls >> 1; }
-    line [lsize++] = 0;
+        lratAdd (S, cls >> 1); }
+      lratAdd (S, 0);
 
     printLine:;
-    for (i = 0; i < lsize; i++) {
-      if (mode == 1) lratAdd (S, line[i]);
-      if (mode == 0) fprintf (file, "%d ", line[i]); }
-    if (mode == 0) fprintf (file, "\n"); } }
+    if (mode == 0) {
+      for (i = tmp; i < S->lratSize; i++)
+        fprintf (file, "%d ", S->lratTable[i]);
+      S->lratSize = tmp;
+      fprintf (file, "\n"); } } }
 
 void printDependencies (struct solver *S, int* clause, int RATflag) {
   printDependenciesFile (S, clause, RATflag, 0);
@@ -748,7 +748,7 @@ int verify (struct solver *S, int begin, int end) {
     if (d && lemmas[1]) { // if delete and not unit
       if ((S->reason[abs (lemmas[0])] - 1) == (lemmas - S->DB)) { // what is this check?
         if (S->mode != FORWARD_SAT) { // ignore pseudo unit clause deletion
-          if (S->verb) { printf ("c ignoring deletion intruction %i: ", (lemmas - S->DB)); printClause (lemmas); }
+          if (S->verb) { printf ("c ignoring deletion intruction %li: ", (lemmas - S->DB)); printClause (lemmas); }
 //        if (S->mode == BACKWARD_UNSAT) { // ignore pseudo unit clause deletion
           S->proof[step] = 0; }
         else { // if (S->mode == FORWARD_SAT) { // also for FORWARD_UNSAT?
