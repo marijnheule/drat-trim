@@ -165,44 +165,44 @@ void analyze (struct solver* S, int* clause, int index) {     // Mark all clause
 
   S->processed = S->assigned = S->forced; }
 
-int propagate (struct solver* S, int init) {        // Performs unit propagation (init not used?)
+int propagate (struct solver* S, int init) {         // Performs unit propagation (init not used?)
   int *start[2];
   int check = 0, mode = !S->prep;
   int i, lit, _lit = 0; long *watch, *_watch;
   start[0] = start[1] = S->processed;
   flip_check:;
   check ^= 1;
-  while (start[check] < S->assigned) {              // While unprocessed false literals
-    lit = *(start[check]++);                        // Get first unprocessed literal
+  while (start[check] < S->assigned) {               // While unprocessed false literals
+    lit = *(start[check]++);                         // Get first unprocessed literal
     if (lit == _lit) watch = _watch;
-    else watch = S->wlist[ lit ];                   // Obtain the first watch pointer
-    while (*watch != END) {                         // While there are watched clauses (watched by lit)
+    else watch = S->wlist[ lit ];                    // Obtain the first watch pointer
+    while (*watch != END) {                          // While there are watched clauses (watched by lit)
      if ((*watch & mode) != check) {
         watch++; continue; }
-     int *clause = S->DB + (*watch >> 1);	    // Get the clause from DB
+     int *clause = S->DB + (*watch >> 1);	     // Get the clause from DB
      if (S->false[ -clause[0] ] ||
          S->false[ -clause[1] ]) {
        watch++; continue; }
-     if (clause[0] == lit) clause[0] = clause[1];   // Ensure that the other watched literal is in front
-      for (i = 2; clause[i]; ++i)                   // Scan the non-watched literals
-        if (S->false[ clause[i] ] == 0) {           // When clause[j] is not false, it is either true or unset
-          clause[1] = clause[i]; clause[i] = lit;   // Swap literals
-          addWatchPtr (S, clause[1], *watch);       // Add the watch to the list of clause[1]
-          *watch = S->wlist[lit][ --S->used[lit] ]; // Remove pointer
+     if (clause[0] == lit) clause[0] = clause[1];    // Ensure that the other watched literal is in front
+      for (i = 2; clause[i]; ++i)                    // Scan the non-watched literals
+        if (S->false[ clause[i] ] == 0) {            // When clause[j] is not false, it is either true or unset
+          clause[1] = clause[i]; clause[i] = lit;    // Swap literals
+          addWatchPtr (S, clause[1], *watch);        // Add the watch to the list of clause[1]
+          *watch = S->wlist[lit][ --S->used[lit] ];  // Remove pointer
           S->wlist[lit][ S->used[lit] ] = END;
-          goto next_clause; }                       // Goto the next watched clause
-      clause[1] = lit; watch++;                     // Set lit at clause[1] and set next watch
-      if (!S->false[  clause[0] ]) {                // If the other watched literal is falsified,
-        assign (S, clause[0]);                      // A unit clause is found, and the reason is set
+          goto next_clause; }                        // Goto the next watched clause
+      clause[1] = lit; watch++;                      // Set lit at clause[1] and set next watch
+      if (!S->false[  clause[0] ]) {                 // If the other watched literal is falsified,
+        assign (S, clause[0]);                       // A unit clause is found, and the reason is set
         S->reason[abs (clause[0])] = ((long) ((clause)-S->DB)) + 1;
         if (!check) {
           start[0]--; _lit = lit; _watch = watch;
           goto flip_check; } }
       else { analyze (S, clause, 0); return UNSAT; } // Found a root level conflict -> UNSAT
-      next_clause: ; } }                            // Set position for next clause
+      next_clause: ; } }                             // Set position for next clause
   if (check) goto flip_check;
   S->processed = S->assigned;
-  return SAT; }	                                    // Finally, no conflict was found
+  return SAT; }	                                     // Finally, no conflict was found
 
 
 // Propagate top level units
@@ -928,6 +928,15 @@ int read_lit (struct solver *S, int *lit) {
   else       *lit = (l >> 1);
   return 1; }
 
+void deactivate (struct solver *S) {
+  S->nActive = 0;
+  int step;
+  for (step = 0; step < S->nStep; step++) {
+    if (S->proof[step] & 1) {
+      int *clause = S->DB + (S->proof[step] >> INFOBITS);
+      if (clause[ID] & ACTIVE) clause[ID] ^= ACTIVE; } }
+}
+
 void shuffleProof (struct solver *S, int iteration) {
   int i, step, _step;
 
@@ -1350,6 +1359,7 @@ int main (int argc, char** argv) {
   if (S.optimize) {
     int iteration = 1;
     while (S.nRemoved) {
+      deactivate (&S);
       shuffleProof (&S, iteration);
       iteration++;
       verify (&S, 0, 0); } }
