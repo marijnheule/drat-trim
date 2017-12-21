@@ -932,7 +932,7 @@ void deactivate (struct solver *S) {
   S->nActive = 0;
   int step;
   for (step = 0; step < S->nStep; step++) {
-    if (S->proof[step] & 1) {
+    if ((S->proof[step] & 1) == 0) {
       int *clause = S->DB + (S->proof[step] >> INFOBITS);
       if (clause[ID] & ACTIVE) clause[ID] ^= ACTIVE; } }
 }
@@ -944,6 +944,7 @@ void shuffleProof (struct solver *S, int iteration) {
   for (i = 1; i < iteration; i++)
     base *= 1.1;
 
+  // randomly remove clause deletion steps
   for (_step = 0, step = 0; step < S->nStep; step++) {
     if (S->proof[step] & 1) {
       int length = 0;
