@@ -243,7 +243,7 @@ void printCore (struct solver *S) {
   for (i = 0; i < S->nClauses; i++) {
     int *clause = S->DB + (S->formula[i] >> INFOBITS);
     if (clause[ID] & ACTIVE) S->COREcount++; }
-  printf ("\rc %i of %li clauses in core\n", S->COREcount, S->nClauses);
+  printf ("\rc %i of %li clauses in core                        \n", S->COREcount, S->nClauses);
 
   if (S->coreStr) {
     FILE *coreFile = fopen (S->coreStr, "w");
@@ -865,7 +865,7 @@ int verify (struct solver *S, int begin, int end) {
         for (f = 1; f <= 20; f++) {
           if ((1.0 - fraction) * 20.0 < 1.0 * f) printf(" ");
           else printf("="); }
-        printf("] time remaining: %.2f seconds", time / (1.0 - fraction) - time);
+        printf("] time remaining: %.2f seconds       ", time / (1.0 - fraction) - time);
         if (step == 0) printf("\n");
         fflush (stdout); }
 
@@ -972,7 +972,11 @@ void shuffleProof (struct solver *S, int iteration) {
 
   for (step = 0; step < S->nStep - 1; step++) {
     long a = S->proof[step  ];
-    long b = S->proof[step+1];
+    int i = 1;
+    long b = S->proof[step+i];
+//    while (b & DBIT) {
+//      if (step + i >= S->nStep) break;
+//      b = S->proof[step + ++i]; }
     int *c = S->DB + (a >> INFOBITS);
     int *d = S->DB + (b >> INFOBITS);
     if (((a & DBIT) == 0) && ((b & DBIT) == 0) && (c[MAXDEP] >= d[MAXDEP])) {
@@ -983,7 +987,7 @@ void shuffleProof (struct solver *S, int iteration) {
       d[ID] = c[ID];
       c[ID] = tmp;
       S->proof[step  ] = b;
-      S->proof[step+1] = a; } }
+      S->proof[step+i] = a; } }
 
   for (step = 0; step < S->nStep; step++) {
     long ad = S->proof[step];
