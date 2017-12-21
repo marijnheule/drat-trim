@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
 Copyright (c) 2015-2017 Marijn Heule, The University of Texas at Austin.
-Last edit, August 30, 2017
+Last edit, December 21, 2017
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -30,14 +30,16 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define END         0
 #define UNSAT       0
 #define SAT         1
-#define EXTRA       3
+#define ID         -1
+#define PIVOT      -2
+#define MAXDEP	   -3
+#define EXTRA       4		// ID + PIVOT + MAXDEP + terminating 0
 #define INFOBITS    2		// could be 1 for SAT, must be 2 for QBF
+#define DBIT        1
 #define ASSUMED     2
 #define MARK        3
 #define ERROR      -1
 #define ACTIVE      1
-#define ID         -1
-#define PIVOT      -2
 
 #define FORWARD_SAT      10
 #define FORWARD_UNSAT    20
@@ -123,12 +125,13 @@ static inline void markWatch (struct solver* S, int* clause, int index, int offs
     if (_clause == clause) { watch[ID] |= ACTIVE; return; } } }
 
 static inline void addDependency (struct solver* S, int dep, int forced) {
-  if (S->traceFile || S->lratFile) {
+  if (1 || S->traceFile || S->lratFile) { // temporary for MAXDEP
     if (S->nDependencies == S->maxDependencies) {
       S->maxDependencies = (S->maxDependencies * 3) >> 1;
 //      printf ("c dependencies increased to %i\n", S->maxDependencies);
       S->dependencies = realloc (S->dependencies, sizeof (int) * S->maxDependencies);
       if (S->dependencies == NULL) { printf ("c MEMOUT: dependencies reallocation failed\n"); exit (0); } }
+//    printf("c adding dep %i\n", (dep << 1) + forced);
     S->dependencies[S->nDependencies++] = (dep << 1) + forced; } }
 
 static inline void markClause (struct solver* S, int* clause, int index) {
@@ -497,6 +500,18 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
       fprintf (file, "\n"); } } }
 
 void printDependencies (struct solver *S, int* clause, int RATflag) {
+  if (clause != NULL) {
+    int i;
+    clause[MAXDEP] = 0;
+    for (i = 0; i < S->nDependencies; i++) {
+//      printf ("%i ", S->dependencies[i]);
+      if (S->dependencies[i] > clause[MAXDEP])
+        clause[MAXDEP] = S->dependencies[i]; }
+//    printf("\n%i :", clause[MAXDEP]);
+//    printClause(clause);
+    assert (clause[MAXDEP] < clause[ID]);
+  }
+
   printDependenciesFile (S, clause, RATflag, 0);
   printDependenciesFile (S, clause, RATflag, 1); }
 
@@ -954,6 +969,22 @@ void shuffleProof (struct solver *S, int iteration) {
     S->proof[_step++] = S->proof[step]; }
   S->nStep = _step;
 
+
+  for (step = 0; step < S->nStep - 1; step++) {
+    long a = S->proof[step  ];
+    long b = S->proof[step+1];
+    int *c = S->DB + (a >> INFOBITS);
+    int *d = S->DB + (b >> INFOBITS);
+    if (((a & DBIT) == 0) && ((b & DBIT) == 0) && (c[MAXDEP] >= d[MAXDEP])) {
+ //     printClause (c);
+ //     printClause (d);
+ //     printf("c %i %i\n", c[MAXDEP], d[MAXDEP]);
+      int tmp = d[ID];
+      d[ID] = c[ID];
+      c[ID] = tmp;
+      S->proof[step  ] = b;
+      S->proof[step+1] = a; } }
+
   for (step = 0; step < S->nStep; step++) {
     long ad = S->proof[step];
     if (ad & 1) continue;
@@ -1359,6 +1390,7 @@ int main (int argc, char** argv) {
 
   if (S.optimize) {
     int iteration = 1;
+//    while (iteration < 20) {
     while (S.nRemoved) {
       deactivate (&S);
       shuffleProof (&S, iteration);
