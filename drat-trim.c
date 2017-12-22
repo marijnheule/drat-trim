@@ -168,44 +168,53 @@ void analyze (struct solver* S, int* clause, int index) {     // Mark all clause
 
   S->processed = S->assigned = S->forced; }
 
-int propagate (struct solver* S, int init) {         // Performs unit propagation (init not used?)
+void noAnalyze (struct solver* S) {
+  while (S->assigned > S->falseStack) {
+    int lit = *(--S->assigned);
+    if (S->assigned >= S->forced) S->reason[abs (lit)] = 0;
+    S->false[lit] = (S->assigned < S->forced); }
+
+  S->processed = S->assigned = S->forced; }
+
+int propagate (struct solver* S, int init, int mark) { // Performs unit propagation (init not used?)
   int *start[2];
   int check = 0, mode = !S->prep;
   int i, lit, _lit = 0; long *watch, *_watch;
   start[0] = start[1] = S->processed;
   flip_check:;
   check ^= 1;
-  while (start[check] < S->assigned) {               // While unprocessed false literals
-    lit = *(start[check]++);                         // Get first unprocessed literal
+  while (start[check] < S->assigned) {                 // While unprocessed false literals
+    lit = *(start[check]++);                           // Get first unprocessed literal
     if (lit == _lit) watch = _watch;
-    else watch = S->wlist[ lit ];                    // Obtain the first watch pointer
-    while (*watch != END) {                          // While there are watched clauses (watched by lit)
+    else watch = S->wlist[ lit ];                      // Obtain the first watch pointer
+    while (*watch != END) {                            // While there are watched clauses (watched by lit)
      if ((*watch & mode) != check) {
         watch++; continue; }
-     int *clause = S->DB + (*watch >> 1);	     // Get the clause from DB
+     int *clause = S->DB + (*watch >> 1);	       // Get the clause from DB
      if (S->false[ -clause[0] ] ||
          S->false[ -clause[1] ]) {
        watch++; continue; }
-     if (clause[0] == lit) clause[0] = clause[1];    // Ensure that the other watched literal is in front
-      for (i = 2; clause[i]; ++i)                    // Scan the non-watched literals
-        if (S->false[ clause[i] ] == 0) {            // When clause[j] is not false, it is either true or unset
-          clause[1] = clause[i]; clause[i] = lit;    // Swap literals
-          addWatchPtr (S, clause[1], *watch);        // Add the watch to the list of clause[1]
-          *watch = S->wlist[lit][ --S->used[lit] ];  // Remove pointer
+     if (clause[0] == lit) clause[0] = clause[1];      // Ensure that the other watched literal is in front
+      for (i = 2; clause[i]; ++i)                      // Scan the non-watched literals
+        if (S->false[ clause[i] ] == 0) {              // When clause[j] is not false, it is either true or unset
+          clause[1] = clause[i]; clause[i] = lit;      // Swap literals
+          addWatchPtr (S, clause[1], *watch);          // Add the watch to the list of clause[1]
+          *watch = S->wlist[lit][ --S->used[lit] ];    // Remove pointer
           S->wlist[lit][ S->used[lit] ] = END;
-          goto next_clause; }                        // Goto the next watched clause
-      clause[1] = lit; watch++;                      // Set lit at clause[1] and set next watch
-      if (!S->false[  clause[0] ]) {                 // If the other watched literal is falsified,
-        assign (S, clause[0]);                       // A unit clause is found, and the reason is set
+          goto next_clause; }                          // Goto the next watched clause
+      clause[1] = lit; watch++;                        // Set lit at clause[1] and set next watch
+      if (!S->false[  clause[0] ]) {                   // If the other watched literal is falsified,
+        assign (S, clause[0]);                         // A unit clause is found, and the reason is set
         S->reason[abs (clause[0])] = ((long) ((clause)-S->DB)) + 1;
         if (!check) {
           start[0]--; _lit = lit; _watch = watch;
           goto flip_check; } }
-      else { analyze (S, clause, 0); return UNSAT; } // Found a root level conflict -> UNSAT
-      next_clause: ; } }                             // Set position for next clause
+      else if (!mark) { noAnalyze (S); return UNSAT; }
+      else { analyze (S, clause, 0); return UNSAT; }   // Found a root level conflict -> UNSAT
+      next_clause: ; } }                               // Set position for next clause
   if (check) goto flip_check;
   S->processed = S->assigned;
-  return SAT; }	                                     // Finally, no conflict was found
+  return SAT; }	                                       // Finally, no conflict was found
 
 
 // Propagate top level units
@@ -221,7 +230,7 @@ static inline int propagateUnits (struct solver* S, int init) {
     S->reason[abs (lit)] = S->unitStack[i] + 1;
     assign (S, lit); }
 
-  if (propagate (S, init) == UNSAT) { return UNSAT; }
+  if (propagate (S, init, 1) == UNSAT) { return UNSAT; }
   S->forced = S->processed;
   return SAT; }
 
@@ -243,7 +252,7 @@ void printCore (struct solver *S) {
   for (i = 0; i < S->nClauses; i++) {
     int *clause = S->DB + (S->formula[i] >> INFOBITS);
     if (clause[ID] & ACTIVE) S->COREcount++; }
-  printf ("\rc %i of %li clauses in core                        \n", S->COREcount, S->nClauses);
+  printf ("\rc %i of %li clauses in core                            \n", S->COREcount, S->nClauses);
 
   if (S->coreStr) {
     FILE *coreFile = fopen (S->coreStr, "w");
@@ -515,7 +524,7 @@ void printDependencies (struct solver *S, int* clause, int RATflag) {
   printDependenciesFile (S, clause, RATflag, 0);
   printDependenciesFile (S, clause, RATflag, 1); }
 
-int checkRAT (struct solver *S, int pivot) {
+int checkRAT (struct solver *S, int pivot, int mark) {
   int i, j, nRAT = 0;
 
   // Loop over all literals to calculate resolution candidates
@@ -568,7 +577,7 @@ int checkRAT (struct solver *S, int pivot) {
         int lit = *RATcls++;
         if (lit != -pivot && !S->false[lit]) {
           assign (S, -lit); S->reason[abs (lit)] = 0; } }
-      if (propagate (S, 0) == SAT) { flag  = 0; break; } }
+      if (propagate (S, 0, mark) == SAT) { flag  = 0; break; } }
     addDependency (S, -id, 1); }
 
   if (flag == 0) {
@@ -582,7 +591,7 @@ int checkRAT (struct solver *S, int pivot) {
 
   return SUCCEED; }
 
-int redundancyCheck (struct solver *S, int *clause, int size) {
+int redundancyCheck (struct solver *S, int *clause, int size, int mark) {
   int i, indegree;
   int falsePivot = S->false[clause[PIVOT]];
   if (S->verb) { printf ("\rc checking lemma (%i, %i) ", size, clause[PIVOT]); printClause (clause); }
@@ -613,7 +622,7 @@ int redundancyCheck (struct solver *S, int *clause, int size) {
     S->reason[abs (clause[i])] = 0; }
 
   S->current = clause;
-  if (propagate (S, 0) == UNSAT) {
+  if (propagate (S, 0, mark) == UNSAT) {
     indegree = S->nResolve - indegree;
     if (indegree <= 2 && S->prep == 0) {
       S->prep = 1; if (S->verb) printf ("\rc [%li] preprocessing checking mode on\n", S->time); }
@@ -636,24 +645,27 @@ int redundancyCheck (struct solver *S, int *clause, int size) {
   S->RATmode = 1;
   S->forced = S->assigned;
 
-  if (checkRAT (S, reslit) == FAILED) {
-    int failed = 1;
+  int failed = 0;
+  if (checkRAT (S, reslit, mark) == FAILED) {
+    failed = 1;
     if (S->warning != NOWARNING) {
       printf ("\rc WARNING: RAT check on proof pivot failed : "); printClause (clause); }
     if (S->warning == HARDWARNING) exit (HARDWARNING);
     for (i = 0; i < size; i++) {
       if (clause[i] == reslit) continue;
-      if (checkRAT (S, clause[i]) == SUCCEED) {
+      if (checkRAT (S, clause[i], mark) == SUCCEED) {
         clause[PIVOT] = clause[i];
-        failed = 0; break; } }
-    if (failed) return FAILED; }
+        failed = 0; break; } } }
 
-  printDependencies (S, clause, 1);
+  if (failed == 0)
+    printDependencies (S, clause, 1);
 
   S->processed = S->forced = savedForced;
   while (S->forced < S->assigned) {
     S->false[*(--S->assigned)] = 0;
     S->reason[abs (*S->assigned)] = 0; }
+
+  if (failed) return FAILED;
 
   S->RATcount++;
   if (S->verb) printf ("\rc lemma has RAT on %i\n", clause[PIVOT]);
@@ -778,7 +790,7 @@ int verify (struct solver *S, int begin, int end) {
 
     if (d && S->mode == FORWARD_SAT) {
       if (size == -1) propagateUnits (S, 0);  // necessary?
-      if (redundancyCheck (S, lemmas, size) == FAILED)  {
+      if (redundancyCheck (S, lemmas, size, 1) == FAILED)  {
         printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
         return SAT; }
       continue; }
@@ -786,7 +798,7 @@ int verify (struct solver *S, int begin, int end) {
     if (d == 0 && S->mode == FORWARD_UNSAT) {
       if (step > end) {
         if (size < 0) continue; // Fix of bus error: 10
-        if (redundancyCheck (S, lemmas, size) == FAILED) {
+        if (redundancyCheck (S, lemmas, size, 1) == FAILED) {
           printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
           return SAT; }
 
@@ -800,7 +812,7 @@ int verify (struct solver *S, int begin, int end) {
     if (size == 1) {
       if (S->verb) printf ("\rc found unit %i\n", lemmas[0]);
       assign (S, lemmas[0]); S->reason[abs (lemmas[0])] = ((long) ((lemmas)-S->DB)) + 1;
-      if (propagate (S, 1) == UNSAT) goto start_verification;
+      if (propagate (S, 1, 1) == UNSAT) goto start_verification;
       S->forced = S->processed; } }
 
   if (S->mode == FORWARD_SAT && active == 0) {
@@ -852,7 +864,7 @@ int verify (struct solver *S, int begin, int end) {
     struct timeval current_time;
     gettimeofday (&current_time, NULL);
     int seconds = (int) (current_time.tv_sec - S->start_time.tv_sec);
-    if (seconds > S->timeout) printf ("s TIMEOUT\n"), exit (0);
+    if ((seconds > S->timeout) && (S->optimize == 0)) printf ("s TIMEOUT\n"), exit (0);
 
     if (S->bar)
       if ((adds % 1000) == 0) {
@@ -865,7 +877,7 @@ int verify (struct solver *S, int begin, int end) {
         for (f = 1; f <= 20; f++) {
           if ((1.0 - fraction) * 20.0 < 1.0 * f) printf(" ");
           else printf("="); }
-        printf("] time remaining: %.2f seconds       ", time / (1.0 - fraction) - time);
+        printf("] time remaining: %.2f seconds ", time / (1.0 - fraction) - time);
         if (step == 0) printf("\n");
         fflush (stdout); }
 
@@ -902,7 +914,7 @@ int verify (struct solver *S, int begin, int end) {
     if (S->verb) {
       printf ("\rc validating clause (%i, %i):  ", clause[PIVOT], size); printClause (clause); }
 
-    if (redundancyCheck (S, clause, size) == FAILED) {
+    if (redundancyCheck (S, clause, size, 1) == FAILED) {
       printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
       return SAT; }
     checked++;
@@ -955,7 +967,7 @@ void deactivate (struct solver *S) {
 void shuffleProof (struct solver *S, int iteration) {
   int i, step, _step;
 
-  double base = 500;
+  double base = 100;
   for (i = 1; i < iteration; i++)
     base *= 1.1;
 
@@ -969,25 +981,24 @@ void shuffleProof (struct solver *S, int iteration) {
     S->proof[_step++] = S->proof[step]; }
   S->nStep = _step;
 
-
-  for (step = 0; step < S->nStep - 1; step++) {
+  for (step = S->nStep - 1; step > 0; step--) {
     long a = S->proof[step  ];
-    int i = 1;
-    long b = S->proof[step+i];
-//    while (b & DBIT) {
-//      if (step + i >= S->nStep) break;
-//      b = S->proof[step + ++i]; }
-    int *c = S->DB + (a >> INFOBITS);
-    int *d = S->DB + (b >> INFOBITS);
-    if (((a & DBIT) == 0) && ((b & DBIT) == 0) && (c[MAXDEP] >= d[MAXDEP])) {
- //     printClause (c);
- //     printClause (d);
- //     printf("c %i %i\n", c[MAXDEP], d[MAXDEP]);
-      int tmp = d[ID];
-      d[ID] = c[ID];
-      c[ID] = tmp;
+    if (a & DBIT) continue;
+    long b = S->proof[step-1];
+    if (b & DBIT) {
       S->proof[step  ] = b;
-      S->proof[step+i] = a; } }
+      S->proof[step-1] = a; }
+    else {
+      int *c = S->DB + (a >> INFOBITS);
+      int *d = S->DB + (b >> INFOBITS);
+      int coinflip = 0;
+//      int coinflip = rand () / (RAND_MAX >> 1);
+      if (c[MAXDEP] < d[MAXDEP] || (coinflip && (c[MAXDEP] < d[ID]))) {
+        int tmp = d[ID];
+        d[ID] = c[ID];
+        c[ID] = tmp;
+        S->proof[step  ] = b;
+        S->proof[step-1] = a; } } }
 
   for (step = 0; step < S->nStep; step++) {
     long ad = S->proof[step];
@@ -1393,6 +1404,7 @@ int main (int argc, char** argv) {
   printf ("\rc verification time: %.3f seconds\n", (double) (runtime / 1000000.0));
 
   if (S.optimize) {
+    printf("c proof optimization started (ignoring the timeout)\n");
     int iteration = 1;
 //    while (iteration < 20) {
     while (S.nRemoved) {
