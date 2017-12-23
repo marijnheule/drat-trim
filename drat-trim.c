@@ -665,9 +665,12 @@ int redundancyCheck (struct solver *S, int *clause, int size, int mark) {
     S->false[*(--S->assigned)] = 0;
     S->reason[abs (*S->assigned)] = 0; }
 
-  if (failed) return FAILED;
+  if (failed) {
+    printf ("c RAT check failed on all possible pivots\n");
+    return FAILED; }
 
-  S->RATcount++;
+
+  if (mark) S->RATcount++;
   if (S->verb) printf ("\rc lemma has RAT on %i\n", clause[PIVOT]);
   return SUCCEED; }
 
@@ -739,6 +742,7 @@ int init (struct solver *S) {
   return SAT; }
 
 int verify (struct solver *S, int begin, int end) {
+  int top_flag = 1;
   if (init (S) == UNSAT) return UNSAT;
 
   if (S->mode == FORWARD_UNSAT) {
@@ -913,7 +917,24 @@ int verify (struct solver *S, int begin, int end) {
 
     if (S->verb) {
       printf ("\rc validating clause (%i, %i):  ", clause[PIVOT], size); printClause (clause); }
-
+/*
+    int i;
+    if (size > 1 && (top_flag == 1)) {
+      int last = clause[size - 1];
+      int pivot = clause[PIVOT];
+      for (i = 0; i < size; i++) {
+        int tmp = clause[i];
+        clause[i] = last;
+        clause[size - 1] = 0;
+        if (tmp == pivot) clause[PIVOT] = clause[0];
+        if (redundancyCheck (S, clause, size - 1, 0) != FAILED) {
+          top_flag = 0;
+          size = size - 1; break; }
+        else {
+          clause[i] = tmp;
+          clause[size - 1] = last; }
+        clause[PIVOT] = pivot; } }
+*/
     if (redundancyCheck (S, clause, size, 1) == FAILED) {
       printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
       return SAT; }
