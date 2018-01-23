@@ -44,10 +44,11 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define FORWARD_SAT      10
 #define FORWARD_UNSAT    20
 #define BACKWARD_UNSAT   30
-#define SUCCEED          40
+#define SUCCESS          40
 #define FAILED           50
-#define NOWARNING	 60
-#define HARDWARNING	 70
+#define FIXPOINT	 60
+#define NOWARNING	 70
+#define HARDWARNING	 80
 
 #define COMPRESS
 
@@ -55,7 +56,8 @@ struct solver { FILE *inputFile, *proofFile, *lratFile, *traceFile, *activeFile;
     int *DB, nVars, timeout, mask, delete, *falseStack, *false, *forced, binMode, optimize, binOutput,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, nActive, *lratTable,
       nLemmas, maxRAT, *RATset, *preRAT, maxDependencies, nDependencies, bar, backforce, reduce,
-      *dependencies, maxVar, maxSize, mode, verb, unitSize, prep, *current, nRemoved, warning, delProof;
+      *dependencies, maxVar, maxSize, mode, verb, unitSize, prep, *current, nRemoved, warning,
+      delProof, *setMap, *setTruth;
     char *coreStr, *lemmaStr;
     struct timeval start_time;
     long mem_used, time, nClauses, nStep, nOpt, nAlloc, *unitStack, *reason, lemmas, nResolve,
@@ -587,9 +589,166 @@ int checkRAT (struct solver *S, int pivot, int mark) {
     if (S->verb) printf ("\rc RAT check on pivot %i failed\n", pivot);
     return FAILED; }
 
-  // S->prep = 0;
+  return SUCCESS; }
 
-  return SUCCEED; }
+int setUCP (struct solver *S, int *cnf, int *trail) {
+  int touched = 0, satisfied = 1;
+  int *clause = cnf;
+
+  while (*clause) {
+    int *literals = clause;
+    int unit = 0, sat = 0, und = 0;
+    int i;
+    while (*literals) {
+      int lit = *literals++;
+      if (S->setTruth[ lit ] == 1) { sat = 1; }
+      if (S->setTruth[ lit ] == 0) { und++; unit = lit; } }
+    clause = literals + 1;
+    if (!sat && und == 1) {
+      sat = 1;
+      touched = 1;
+      *trail++ = unit;
+      *trail   = 0;
+      if (S->verb) printf("c found unit %i\n", unit);
+      S->setTruth[ unit] =  1;
+      S->setTruth[-unit] = -1; }
+    satisfied &= sat;
+    if (!sat && !und) return FAILED; }
+
+  *trail = 0;
+  if (satisfied) return SUCCESS;
+  if ( touched ) return setUCP (S, cnf, trail);
+  return FIXPOINT; }
+
+int setDLL (struct solver *S, int *cnf, int *trail) {
+  int res = setUCP (S, cnf, trail);
+  if (res == SUCCESS) return SUCCESS;
+  if (res == FAILED ) return FAILED;
+  while (*trail) trail++;
+
+  int decision = 1;
+  while (S->setTruth[decision]) decision++;
+
+  *trail++ = decision;
+  *trail   = 0;
+  S->setTruth[ decision] =  1;
+  S->setTruth[-decision] = -1;
+
+  if (S->verb) printf("c branch on %i\n", decision);
+  if (setDLL (S, cnf, trail) == SUCCESS) return SUCCESS;
+
+  while (*trail) trail++;
+  while (*trail != decision) {
+    S->setTruth[ *trail] = 0;
+    S->setTruth[-*trail] = 0;
+    trail--; }
+
+  *trail++ = -decision;
+  *trail = 0;
+  S->setTruth[ decision] = -1;
+  S->setTruth[-decision] =  1;
+
+  if (S->verb) printf("c branch on %i\n", -decision);
+  return setDLL (S, cnf, trail); }
+
+int setRedundancyCheck (struct solver *S, int *clause, int size, int uni) {
+  int i, j, blocked, nSPR = 0;
+  long int reason;
+
+  int *trail = (int*) malloc (sizeof(int) * (size + 1));
+
+  if (S->verb) printf("c starting SPR check\n");
+
+  for (i = 1; i <= size; i++) {
+    trail            [i - 1]  =  0;
+    S->setMap[ clause[i - 1]] =  i;
+    S->setMap[-clause[i - 1]] = -i; }
+
+  // Loop over all literals to calculate resolution candidates
+  for (i = -S->maxVar; i <= S->maxVar; i++) {
+    if (i == 0) continue;
+    // Loop over all watched clauses for literal
+    for (j = 0; j < S->used[i]; j++) {
+      int* watchedClause = S->DB + (S->wlist[i][j] >> 1);
+      if (*watchedClause == i) { // If watched literal is in first position
+        int flag = 0;
+        blocked = 0;
+        reason = 0;
+        while (*watchedClause) {
+          int lit = *watchedClause++;
+          if (S->setMap[lit] < 0) flag = 1;
+          else if (!S->setMap[lit] && S->false[-lit]) {
+            if (blocked == 0 || reason > S->reason[ abs(lit) ])
+              blocked = lit, reason = S->reason[ abs(lit) ]; } }
+
+       if (blocked != 0 && reason != 0 && flag == 1) {
+         analyze (S, S->DB + reason, -1); S->reason[abs(blocked)] = 0; }
+
+       // If resolution candidate, add to list
+       if (blocked == 0 && flag == 1) {
+         if (nSPR == S->maxRAT) {
+           S->maxRAT = (S->maxRAT * 3) >> 1;
+           S->RATset = realloc(S->RATset, sizeof(int) * S->maxRAT); }
+         S->RATset[nSPR++] = S->wlist[i][j] >> 1; } } } }
+
+  // Check all candidates for RUP
+  int cnfSize = size + 2; // first clause + terminating zero
+  int filtered = 0;
+  for (i = 0; i < nSPR; i++) {
+    int inSet = 1;
+    int* candidate = S->DB + S->resolutionCandidates[i];
+    if (S->verb) {
+      printf("c candidate: "); printLiterals (candidate); }
+    while (*candidate) { int lit = *candidate++;
+      if (S->setMap[lit]) inSet++;
+      if (!S->setMap[lit] && !S->false[lit]) {
+        ASSIGN(-lit); S->reason[abs(lit)] = 0; } }
+    if (propagate (S, 0) == SAT) {
+      if (S->verb) printf(" FAILED\n");
+      cnfSize += inSet;
+      S->processed = S->forced;
+      while (S->forced < S->assigned) S->false[*(--S->assigned)] = 0;
+      S->resolutionCandidates[filtered++] = S->resolutionCandidates[i]; }
+    else {
+      if (S->verb) printf(" SUCCESS\n"); } }
+
+  int *cnf = (int*) malloc (sizeof(int) * cnfSize);
+  int *tmp = cnf;
+  for (i = 1; i <= size; i++) *tmp++ = i;
+  *tmp++ = 0;
+  numCandidates = filtered;
+  for (i = 0; i < numCandidates; i++) {
+    int* candidate = S->DB + S->resolutionCandidates[i];
+    while (*candidate) {
+      int lit = *candidate++;
+      if (S->setMap[lit]) *tmp++ = S->setMap[lit]; }
+    *tmp++ = 0; }
+  *tmp++ = 0;
+
+  if (S->verb) {
+    tmp = cnf;
+    printf("c printing CNF:\n");
+    while (*tmp) {
+      int *clause = tmp;
+      printf("c ");
+      while (*clause) printf("%i ", *clause++);
+      printf("\n");
+      tmp = clause + 1; } }
+
+  int res = setDLL (S, cnf, trail);
+  if (S->verb) {
+    if (res == SUCCESS) printf("c SUCCESS\n");
+    if (res == FAILED ) printf("c FAILED\n"); }
+
+  for (i = 1; i <= size; i++) {
+    S->setMap[ clause[i - 1]] = 0;
+    S->setMap[-clause[i - 1]] = 0;
+    S->setTruth[  i ]         = 0;
+    S->setTruth[ -i ]         = 0; }
+
+  free(trail);
+  free( cnf );
+  return res; }
 
 int redundancyCheck (struct solver *S, int *clause, int size, int mark) {
   int i, indegree;
@@ -597,12 +756,12 @@ int redundancyCheck (struct solver *S, int *clause, int size, int mark) {
   if (S->verb) { printf ("\rc checking lemma (%i, %i) ", size, clause[PIVOT]); printClause (clause); }
 
   if (S->mode != FORWARD_UNSAT) {
-    if ((clause[ID] & ACTIVE) == 0) return SUCCEED; }  // redundant?
+    if ((clause[ID] & ACTIVE) == 0) return SUCCESS; }  // redundant?
 //    clause[PIVOT] ^= ACTIVE; }
 
   if (size < 0) {
     S->DB[ S->reason[abs (*clause)] - 2] |= 1;
-    return SUCCEED; }
+    return SUCCESS; }
 
   indegree = S->nResolve;
 
@@ -616,7 +775,7 @@ int redundancyCheck (struct solver *S, int *clause, int size, int mark) {
       while (S->forced < S->assigned) {
         S->false[*(--S->assigned)] = 0;
         S->reason[abs (*S->assigned)] = 0; }
-      return SUCCEED; }
+      return SUCCESS; }
     S->false[clause[i]] = ASSUMED;
     *(S->assigned++) = clause[i];
     S->reason[abs (clause[i])] = 0; }
@@ -630,7 +789,7 @@ int redundancyCheck (struct solver *S, int *clause, int size, int mark) {
       S->prep = 0; if (S->verb) printf ("\rc [%li] preprocessing checking mode off\n", S->time); }
     if (S->verb) printf ("\rc lemma has RUP\n");
     printDependencies (S, clause, 0);
-    return SUCCEED; }
+    return SUCCESS; }
 
   // Failed RUP check.  Now test RAT.
   // printf ("RUP check failed.  Starting RAT check.\n");
@@ -653,7 +812,7 @@ int redundancyCheck (struct solver *S, int *clause, int size, int mark) {
     if (S->warning == HARDWARNING) exit (HARDWARNING);
     for (i = 0; i < size; i++) {
       if (clause[i] == reslit) continue;
-      if (checkRAT (S, clause[i], mark) == SUCCEED) {
+      if (checkRAT (S, clause[i], mark) == SUCCESS) {
         clause[PIVOT] = clause[i];
         failed = 0; break; } } }
 
@@ -672,7 +831,7 @@ int redundancyCheck (struct solver *S, int *clause, int size, int mark) {
 
   if (mark) S->RATcount++;
   if (S->verb) printf ("\rc lemma has RAT on %i\n", clause[PIVOT]);
-  return SUCCEED; }
+  return SUCCESS; }
 
 int init (struct solver *S) {
   S->forced     = S->falseStack; // Points inside *falseStack at first decision (unforced literal)
@@ -1240,9 +1399,11 @@ int parse (struct solver* S) {
   int n = S->maxVar;
   S->falseStack = (int  *) malloc ((    n + 1) * sizeof (int )); // Stack of falsified literals -- this pointer is never changed
   S->reason     = (long *) malloc ((    n + 1) * sizeof (long)); // Array of clauses
-  S->used       = (int  *) malloc ((2 * n + 1) * sizeof (int )); S->used  += n; // Labels for variables, non-zero means false
-  S->max        = (int  *) malloc ((2 * n + 1) * sizeof (int )); S->max   += n; // Labels for variables, non-zero means false
-  S->false      = (int  *) malloc ((2 * n + 1) * sizeof (int )); S->false += n; // Labels for variables, non-zero means false
+  S->used       = (int  *) malloc ((2 * n + 1) * sizeof (int )); S->used     += n; // Labels for variables, non-zero means false
+  S->max        = (int  *) malloc ((2 * n + 1) * sizeof (int )); S->max      += n; // Labels for variables, non-zero means false
+  S->false      = (int  *) malloc ((2 * n + 1) * sizeof (int )); S->false    += n; // Labels for variables, non-zero means false
+  S->setMap     = (int  *) malloc ((2 * n + 1) * sizeof (int )); S->setMap   += n; // Labels for variables, non-zero means false
+  S->setTruth   = (int  *) malloc ((2 * n + 1) * sizeof (int )); S->setTruth += n; // Labels for variables, non-zero means false
 
   S->optproof   = (long *) malloc (sizeof(long) * (2 * S->nLemmas + S->nClauses));
 
@@ -1263,9 +1424,11 @@ int parse (struct solver* S) {
 
   S->wlist = (long**) malloc (sizeof (long*) * (2*n+1)); S->wlist += n;
 
-  for (i = 1; i <= n; ++i) { S->max  [ i] = S->max  [-i] = INIT;
-                             S->wlist[ i] = (long*) malloc (sizeof (long) * S->max[ i]);
-                             S->wlist[-i] = (long*) malloc (sizeof (long) * S->max[-i]); }
+  for (i = 1; i <= n; ++i) { S->max     [ i] = S->max     [-i] = INIT;
+                             S->setMap  [ i] = S->setMap  [-i] =    0;
+                             S->setTruth[ i] = S->setTruth[-i] =    0;
+                             S->wlist   [ i] = (long*) malloc (sizeof (long) * S->max[ i]);
+                             S->wlist   [-i] = (long*) malloc (sizeof (long) * S->max[-i]); }
 
   S->unitStack = (long *) malloc (sizeof (long) * n);
 
@@ -1408,6 +1571,9 @@ int main (int argc, char** argv) {
 
   fclose (S.inputFile);
   fclose (S.proofFile);
+
+  if (S.mode == FORWARD_UNSAT) {
+    S.reduce = 0; }
 
   if (S.delProof && argv[2] != NULL) {
     int ret = remove(argv[2]);
