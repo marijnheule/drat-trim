@@ -620,6 +620,7 @@ int setUCP (struct solver *S, int *cnf, int *trail) {
   if ( touched ) return setUCP (S, cnf, trail);
   return FIXPOINT; }
 
+/*
 int setDLL (struct solver *S, int *cnf, int *trail) {
   int res = setUCP (S, cnf, trail);
   if (res == SUCCESS) return SUCCESS;
@@ -749,6 +750,7 @@ int setRedundancyCheck (struct solver *S, int *clause, int size, int uni) {
   free(trail);
   free( cnf );
   return res; }
+*/
 
 int redundancyCheck (struct solver *S, int *clause, int size, int mark) {
   int i, indegree;
