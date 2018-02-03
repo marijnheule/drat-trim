@@ -48,7 +48,7 @@ void printClause (int* clause) {
 int checkRedundancy (int pivot, int start, int *hints, long long thisMask) {
   int res = abs(*hints++);
 
-  if (res > 0) {
+  if (res != 0) {
     while (start < res) {
       if (clsList[start++] != DELETED) {
         int *clause = table + clsList[start-1];
@@ -68,9 +68,9 @@ int checkRedundancy (int pivot, int start, int *hints, long long thisMask) {
 
   while (*hints > 0) {
     if (clsList[*hints] == DELETED) { printf ("c ERROR: using DELECT clause\n"); exit (2); };
-    int unit = 0, *clause = table + clsList[*hints++];
+    int unit = 0, *clause = table + clsList[*(hints++)];
     while (*clause) {
-      int clit = convertLit (*clause++);
+      int clit = convertLit (*(clause++));
 //      assert (clit < maskAlloc);
       if (mask[clit] >= thisMask) continue; // lit is falsified
       if (unit != 0) return FAILED;
@@ -116,13 +116,13 @@ int checkClause (int* list, int size, int* hints) {
 
 void addClause (int index, int* literals, int size) {
   if (index >= clsAlloc) {
+    int i = clsAlloc;
     clsAlloc = (index * 3) >> 1;
-//    printf("c realloc mask clsList %i\n", clsAlloc);
-    clsList = (int*) realloc (clsList, sizeof(int) * clsAlloc); }
+    clsList = (int*) realloc (clsList, sizeof(int) * clsAlloc);
+    while (i < clsAlloc) clsList[i++] = DELETED; }
 
   if (tableSize + size >= tableAlloc) {
     tableAlloc = (tableAlloc * 3) >> 1;
-//    printf("c realloc table to %i\n", tableAlloc);
     table = (int*) realloc (table, sizeof (int) * tableAlloc); }
 
   clsList[index] = tableSize;
@@ -173,7 +173,7 @@ int parseLine (FILE* file, int *list, int mode) {
 int main (int argc, char** argv) {
   now = 0, clsLast = 0;
 
-  int nVar = 0, nCls = 0;
+  int i, nVar = 0, nCls = 0;
   char ignore[1024];
   FILE* cnf   = fopen (argv[1], "r");
   for (;;) {
@@ -186,6 +186,7 @@ int main (int argc, char** argv) {
 
   clsAlloc = nCls * 2;
   clsList  = (int*) malloc (sizeof(int) * clsAlloc);
+  for (i = 0; i < clsAlloc; i++) clsList[i] = DELETED;
 
   tableSize  = 0;
   tableAlloc = nCls * 2;
@@ -203,7 +204,7 @@ int main (int argc, char** argv) {
 
   maskAlloc = 20 * nVar;
   mask = (long long*) malloc (sizeof(long long) * maskAlloc);
-  int i; for (i = 0; i < maskAlloc; i++) mask[i] = 0;
+  for (i = 0; i < maskAlloc; i++) mask[i] = 0;
 
   FILE* proof = fopen (argv[2], "r");
   int mode = LRAT;
