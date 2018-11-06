@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
-Copyright (c) 2015-2017 Marijn Heule, The University of Texas at Austin.
-Last edit, December 21, 2017
+Copyright (c) 2015-2018 Marijn Heule, The University of Texas at Austin.
+Last edit, October 30, 2018
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -266,13 +266,13 @@ void printCore (struct solver *S) {
         fprintf (coreFile, "0\n"); } }
     fclose (coreFile); } }
 
-void write_lit (struct solver *S, int lit) { // change to long?
+void write_lit (struct solver *S, FILE *output, int lit) { // change to long?
   unsigned int l = abs (lit) << 1;
   if (lit < 0) l++;
 
   do {
-    if (l <= 127) { fputc ((char)                 l, S->lratFile); }
-    else          { fputc ((char) (128 + (l & 127)), S->lratFile); }
+    if (l <= 127) { fputc ((char)                 l, output); }
+    else          { fputc ((char) (128 + (l & 127)), output); }
     S->nWrites++;
     l = l >> 7; }
   while (l); }
@@ -281,10 +281,10 @@ void printLRATline (struct solver *S, int time) {
   int *line = S->lratTable + S->lratLookup[time];
   if (S->binOutput) {
     fputc ('a', S->lratFile); S->nWrites++;
-    while (*line) write_lit (S, *line++);
-    write_lit (S, *line++);
-    while (*line) write_lit (S, *line++);
-    write_lit (S, *line++); }
+    while (*line) write_lit (S, S->lratFile, *line++);
+    write_lit (S, S->lratFile, *line++);
+    while (*line) write_lit (S, S->lratFile, *line++);
+    write_lit (S, S->lratFile, *line++); }
   else {
     while (*line) fprintf (S->lratFile, "%i ", *line++);
     fprintf (S->lratFile, "%i ", *line++);
@@ -323,19 +323,27 @@ void printProof (struct solver *S) {
       long ad = S->proof[step];
       int *lemmas = S->DB + (ad >> INFOBITS);
       if (!lemmas[1] && (ad & 1)) continue; // don't delete unit clauses
-      if (ad & 1) fprintf (lemmaFile, "d ");
+      if (S->binOutput) {
+        S->nWrites++;
+        if (ad & 1) fputc ('d', lemmaFile);
+        else        fputc ('a', lemmaFile); }
+      else if (ad & 1) fprintf (lemmaFile, "d ");
       int reslit = lemmas[PIVOT];
       while (*lemmas) {
         int lit = *lemmas++;
-        if (lit == reslit)
-        fprintf (lemmaFile, "%i ", lit); }
+        if (lit == reslit) {
+          if (S->binOutput) write_lit (S, lemmaFile, lit);
+          else fprintf (lemmaFile, "%i ", lit); } }
       lemmas = S->DB + (ad >> INFOBITS);
       while (*lemmas) {
         int lit = *lemmas++;
-        if (lit != reslit)
-          fprintf (lemmaFile, "%i ", lit); }
-      fprintf (lemmaFile, "0\n"); }
-    fprintf (lemmaFile, "0\n");
+        if (lit != reslit) {
+          if (S->binOutput) write_lit (S, lemmaFile, lit);
+          else fprintf (lemmaFile, "%i ", lit); } }
+      if (S->binOutput) write_lit (S, lemmaFile, 0);
+      else fprintf (lemmaFile, "0\n"); }
+    if (S->binOutput) { fputc ('a', lemmaFile); write_lit (S, lemmaFile, 0); }
+    else fprintf (lemmaFile, "0\n");
     fclose (lemmaFile); }
 
   if (S->lratFile) {
@@ -347,7 +355,7 @@ void printProof (struct solver *S) {
       if ((ad & 1) == 0) {
         if (lastAdded == 0) {
           if (S->binOutput) {
-            write_lit (S, 0); }
+            write_lit (S, S->lratFile, 0); }
           else {
             fprintf (S->lratFile, "0\n"); } }
         lastAdded = lemmas[ID] >> 1;
@@ -362,12 +370,12 @@ void printProof (struct solver *S) {
             fprintf (S->lratFile, "%i d ", lastAdded); } }
         lastAdded = 0;
         if (S->binOutput) {
-          write_lit (S, lemmas[ID] >> 1); }
+          write_lit (S, S->lratFile, lemmas[ID] >> 1); }
         else {
           fprintf (S->lratFile, "%i ", lemmas[ID] >> 1); } } }
     if (lastAdded != S->nClauses) {
       if (S->binOutput) {
-        write_lit (S, 0); }
+        write_lit (S, S->lratFile, 0); }
       else {
         fprintf(S->lratFile, "0\n"); } }
 
@@ -388,11 +396,11 @@ void printNoCore (struct solver *S) {
       int *clause = S->DB + (S->formula[i] >> INFOBITS);
       if ((clause[ID] & ACTIVE) == 0) {
         if (S->binOutput) {
-          write_lit (S, clause[ID] >> 1); }
+          write_lit (S, S->lratFile, clause[ID] >> 1); }
         else {
           fprintf (S->lratFile, "%i ", clause[ID] >> 1); } } }
     if (S->binOutput) {
-      write_lit (S, 0); }
+      write_lit (S, S->lratFile, 0); }
     else {
       fprintf (S->lratFile, "0\n"); } } }
 
@@ -1481,6 +1489,7 @@ void printHelp ( ) {
   printf ("  -O          optimize proof till fixpoint by repeating verification\n");
   printf ("  -C          compress core lemmas (emit binary proof)\n");
   printf ("  -D          delete proof file after parsing\n");
+  printf ("  -i          force binary proof parse mode\n");
   printf ("  -w          suppress warning messages\n");
   printf ("  -W          exit after first warning\n");
   printf ("  -p          run in plain mode (i.e., ignore deletion information)\n\n");
@@ -1534,6 +1543,7 @@ int main (int argc, char** argv) {
       else if (argv[i][1] == 'O') S.optimize   = 1;
       else if (argv[i][1] == 'C') S.binOutput  = 1;
       else if (argv[i][1] == 'D') S.delProof   = 1;
+      else if (argv[i][1] == 'i') S.binMode    = 1;
       else if (argv[i][1] == 'u') S.mask       = 1;
       else if (argv[i][1] == 'v') S.verb       = 1;
       else if (argv[i][1] == 'w') S.warning    = NOWARNING;
@@ -1554,13 +1564,29 @@ int main (int argc, char** argv) {
         if (S.proofFile == NULL) {
           printf ("\rc error opening \"%s\".\n", argv[i]); return ERROR; }
 
-        int j;
-        for (j = 0; j < 10; j++) {
-          int c = getc_unlocked (S.proofFile);
-          if (c == EOF) break;
-          if ((c != 100) && (c != 10) && (c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && ((c < 65) || (c > 122)))  {
-            printf ("\rc turning on binary mode checking\n");
-            S.binMode = 1; break; } }
+       int c, comment = 1;
+       if (S.binMode == 0) {
+          c = getc_unlocked (S.proofFile); // check the first character in the file
+          if (c == EOF) { S.binMode = 1; continue; }
+          if ((c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (c != 99) && (c != 100)) {
+             printf ("\rc turning on binary mode checking\n");
+             S.binMode = 1; }
+          if (c != 99) comment = 0; }
+        if (S.binMode == 0) {
+          c = getc_unlocked (S.proofFile); // check the second character in the file
+          if (c == EOF) { S.binMode = 1; continue; }
+          if ((c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (c != 99) && (c != 100)) {
+             printf ("\rc turning on binary mode checking\n");
+             S.binMode = 1; }
+          if (c != 32) comment = 0; }
+        if (S.binMode == 0) {
+          int j;
+          for (j = 0; j < 10; j++) {
+            c = getc_unlocked (S.proofFile);
+            if (c == EOF) break;
+            if ((c != 100) && (c != 10) && (c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (comment && ((c < 65) || (c > 122))))  {
+              printf ("\rc turning on binary mode checking\n");
+              S.binMode = 1; break; } } }
         fclose (S.proofFile);
         S.proofFile = fopen (argv[2], "r");
         if (S.proofFile == NULL) {
@@ -1585,7 +1611,7 @@ int main (int argc, char** argv) {
   if       (parseReturnValue == ERROR)          printf ("\rs MEMORY ALLOCATION ERROR\n");
   else if  (parseReturnValue == UNSAT)          printf ("\rc trivial UNSAT\ns VERIFIED\n");
   else if  ((sts = verify (&S, -1, -1)) == UNSAT) printf ("\rs VERIFIED\n");
-  else printf ("\rs NOT VERIFIED\n")  ;
+  else printf ("\ns NOT VERIFIED\n")  ;
   struct timeval current_time;
   gettimeofday (&current_time, NULL);
   long runtime = (current_time.tv_sec  - S.start_time.tv_sec) * 1000000 +
@@ -1595,8 +1621,7 @@ int main (int argc, char** argv) {
   if (S.optimize) {
     printf("c proof optimization started (ignoring the timeout)\n");
     int iteration = 1;
-//    while (iteration < 20) {
-    while (S.nRemoved) {
+    while (S.nRemoved && iteration < 10000) {
       deactivate (&S);
       shuffleProof (&S, iteration);
       iteration++;
