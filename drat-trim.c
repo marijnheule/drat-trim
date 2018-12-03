@@ -24,6 +24,8 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <assert.h>
 #include <sys/time.h>
 
+#include "drat-trim.h"
+
 #define TIMEOUT     20000
 #define BIGINIT     1000000
 #define INIT        4
@@ -1500,7 +1502,7 @@ void printHelp ( ) {
   printf ("  PROOF       proof file in DRAT format (stdin if no argument)\n\n");
   exit (0); }
 
-int main (int argc, char** argv) {
+int run_drat_trim (int argc, char** argv) {
   struct solver S;
 
   S.inputFile  = NULL;
