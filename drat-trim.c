@@ -1568,14 +1568,14 @@ int main (int argc, char** argv) {
        if (S.binMode == 0) {
           c = getc_unlocked (S.proofFile); // check the first character in the file
           if (c == EOF) { S.binMode = 1; continue; }
-          if ((c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (c != 99) && (c != 100)) {
+          if ((c != 10) && (c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (c != 99) && (c != 100)) {
              printf ("\rc turning on binary mode checking\n");
              S.binMode = 1; }
           if (c != 99) comment = 0; }
         if (S.binMode == 0) {
           c = getc_unlocked (S.proofFile); // check the second character in the file
           if (c == EOF) { S.binMode = 1; continue; }
-          if ((c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (c != 99) && (c != 100)) {
+          if ((c != 10) && (c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (c != 99) && (c != 100)) {
              printf ("\rc turning on binary mode checking\n");
              S.binMode = 1; }
           if (c != 32) comment = 0; }
