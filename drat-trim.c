@@ -1259,7 +1259,10 @@ int parse (struct solver* S) {
           if      (res == EOF) break;
           else if (res ==  97) del = 0;
           else if (res == 100) del = 1;
-          else { printf ("\rc ERROR: wrong binary prefix\n"); exit (0); }
+          else {
+            if (S->warning != NOWARNING) {
+              printf ("\rc WARNING: wrong binary prefix, stop reading proof\n"); break; }
+            if (S->warning == HARDWARNING) exit (HARDWARNING); }
           S->nReads++; }
         else {
           tmp = fscanf (S->proofFile, " d  %i ", &lit);
