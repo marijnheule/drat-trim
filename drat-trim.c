@@ -449,7 +449,9 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
     if (clause != NULL) {
       int size = 0;
       int *sortClause;
+
       sortClause = (int *) malloc (sizeof(int) * S->maxSize);
+      assert (sortClause != NULL);
       lratAdd (S, S->time >> 1); // NB: long to ing
       int reslit = clause[PIVOT];
       while (*clause) {
@@ -460,7 +462,8 @@ void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode
       for (i = 0; i < size; i++) {
         int lit = sortClause[i];
         if (lit != reslit)
-          lratAdd (S, lit); } }
+          lratAdd (S, lit); }
+      free (sortClause); }
     else { lratAdd (S, S->count); }
     lratAdd (S, 0);
 
