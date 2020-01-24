@@ -885,7 +885,7 @@ int init (struct solver *S) {
       return UNSAT; }
     if (clause[1]) { addWatch (S, clause, 0); addWatch (S, clause, 1); }
     else if (S->falseA[clause[0]]) {
-      printf ("\rc found complementary unit clauses\n");
+      printf ("\rc found complementary unit clauses: %i\n", clause[0]);
       if (S->coreStr) {
         FILE *coreFile = fopen (S->coreStr, "w");
         fprintf (coreFile, "p cnf %i 2\n%i 0\n%i 0\n", abs (clause[0]), clause[0], -clause[0]);
@@ -997,7 +997,9 @@ int verify (struct solver *S, int begin, int end) {
   if (S->mode == FORWARD_UNSAT) {
     if (begin == end) {
       postprocess (S);
-      printf ("\rc ERROR: all lemmas verified, but no conflict\n"); }
+      printf ("\rc VERIFIED derivation: all lemmas preserve satisfiability\n");
+      if (S->warning != NOWARNING) {
+        printf ("c WARNING: no empty clause detected, this is not a refutation\n"); } }
     return SAT; }
 
   if (S->mode == BACKWARD_UNSAT) {
