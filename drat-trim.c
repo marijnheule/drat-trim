@@ -30,6 +30,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define END         0
 #define UNSAT       0
 #define SAT         1
+#define DERIVATION  2
 #define ID         -1
 #define PIVOT      -2
 #define MAXDEP	   -3
@@ -999,7 +1000,8 @@ int verify (struct solver *S, int begin, int end) {
       postprocess (S);
       printf ("\rc VERIFIED derivation: all lemmas preserve satisfiability\n");
       if (S->warning != NOWARNING) {
-        printf ("\rc WARNING: no empty clause detected, this is not a refutation\n"); } }
+        printf ("\rc WARNING: no empty clause detected, this is not a refutation\n"); }
+      return DERIVATION; }
     return SAT; }
 
   if (S->mode == BACKWARD_UNSAT) {
@@ -1619,6 +1621,7 @@ int main (int argc, char** argv) {
   if       (parseReturnValue == ERROR)          printf ("\rs MEMORY ALLOCATION ERROR\n");
   else if  (parseReturnValue == UNSAT)          printf ("\rc trivial UNSAT\ns VERIFIED\n");
   else if  ((sts = verify (&S, -1, -1)) == UNSAT) printf ("\rs VERIFIED\n");
+  else if  (sts == DERIVATION)                  printf ("\rs DERIVATION\n");
   else printf ("\ns NOT VERIFIED\n")  ;
   struct timeval current_time;
   gettimeofday (&current_time, NULL);
