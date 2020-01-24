@@ -999,7 +999,7 @@ int verify (struct solver *S, int begin, int end) {
       postprocess (S);
       printf ("\rc VERIFIED derivation: all lemmas preserve satisfiability\n");
       if (S->warning != NOWARNING) {
-        printf ("c WARNING: no empty clause detected, this is not a refutation\n"); } }
+        printf ("\rc WARNING: no empty clause detected, this is not a refutation\n"); } }
     return SAT; }
 
   if (S->mode == BACKWARD_UNSAT) {
