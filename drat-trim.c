@@ -1292,12 +1292,12 @@ int parse (struct solver* S) {
         fileSwitchFlag = 1; } }
 
     if (tmp == 0) {
-      char ignore[1024];
+      char ignore[1<<16];
       if (!fileSwitchFlag) { if (fgets (ignore, sizeof (ignore), S->inputFile) == NULL) printf ("c\n"); }
       else if (fgets (ignore, sizeof (ignore), S->proofFile) == NULL) printf ("c\n");
-      for (i = 0; i < 1024; i++) { if (ignore[i] == '\n') break; }
-      if (i == 1024) {
-        printf ("c ERROR: comment longer than 1024 characters: %s\n", ignore);
+      for (i = 0; i < sizeof ignore; i++) { if (ignore[i] == '\n') break; }
+      if (i == sizeof ignore) {
+        printf ("c ERROR: comment longer than %zu characters: %s\n", sizeof ignore, ignore);
         exit (HARDWARNING); }
       if (S->verb) printf ("\rc WARNING: parsing mismatch assuming a comment\n");
       continue; }
