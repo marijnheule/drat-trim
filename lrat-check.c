@@ -1,6 +1,6 @@
 /************************************************************************************[lrat-check.c]
-Copyright (c) 2017 Marijn Heule, The University of Texas at Austin.
-Last edit, June 10, 2017
+Copyright (c) 2017-2020 Marijn Heule, Carnegie Mellon University
+Last edit: June 1, 2020
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
