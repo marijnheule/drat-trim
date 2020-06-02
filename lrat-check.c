@@ -140,6 +140,16 @@ void deleteClauses (int* list) {
 int parseLine (FILE* file, int *list, int mode) {
   int lit, index, tmp, count = 0;
 
+  char c;
+  while (1) {
+    tmp = fscanf (file, " c%c", &c);
+    if (tmp == EOF) return 0;
+    if (tmp ==   0) break;
+    while (1) {
+      if (tmp == EOF ) return 0;
+      if (c   == '\n') break;
+      tmp = fscanf (file, "%c", &c); } }
+
   if (mode == CNF) {
     while (1) {
       tmp = fscanf (file, " %i ", &lit);
