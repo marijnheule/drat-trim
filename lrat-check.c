@@ -44,6 +44,7 @@ long long *mask, now;
 
 int *clsList, clsAlloc, clsLast;
 int *table, tableSize, tableAlloc, maskAlloc;
+int *litList, litCount, litAlloc;
 
 int  getType   (int* list) { return list[1]; }
 int  getIndex  (int* list) { return list[0]; }
@@ -157,10 +158,18 @@ void deleteClauses (int* list) {
   } 
 }
 
-int parseLine (FILE* file, int *list, int mode) {
-  int lit, index, tmp, count = 0;
+static void addLit(int lit) {
+    if (litCount >= litAlloc) {
+	litAlloc = (litAlloc * 3) >> 1;
+	litList = (int*) realloc (litList, sizeof (int) * litAlloc);
+    }
+    litList[litCount++] = lit;
+}
 
-  char c;
+int parseLine (FILE* file, int mode) {
+  int lit, index, tmp;
+  litCount = 0;
+  char c = 0;
   while (1) {
     tmp = fscanf (file, " c%c", &c);
     if (tmp == EOF) return 0;
@@ -174,30 +183,37 @@ int parseLine (FILE* file, int *list, int mode) {
     while (1) {
       tmp = fscanf (file, " %i ", &lit);
       if (tmp == 0 || tmp == EOF) return 0;
-      list[count++] = lit;
-      if (lit == 0) return count; } }
+      addLit(lit);
+      if (lit == 0) return litCount; } }
 
   if (mode == LRAT) {
     int zeros = 2;
     tmp = fscanf (file, " %i ", &index);
     if (tmp == 0 || tmp == EOF) return 0;
-    list[count++] = index;
+    addLit(index);
 
     tmp = fscanf (file, " d %i ", &lit);
     if (tmp == 1) {
-      list[count++] = (int) 'd';
-      list[count++] = lit; zeros--;
+      addLit((int) 'd');
+      addLit(lit);
+      zeros--;
       if (lit   == 0) zeros--;
-      if (zeros == 0) return count; }
-    else { list[count++] = (int) 'a'; }
+      if (zeros == 0) {
+	  //	  printf("Processed line %d %c.  Length = %d\n", litList[1], litList[2], litCount);
+	  return litCount; }
+    }
+    else { addLit((int) 'a'); }
 
     while (1) {
       tmp = fscanf (file, " %i ", &lit);
       if (tmp == 0 || tmp == EOF) return 0;
-      list[count++] = lit;
+      addLit(lit);
       if (lit   == 0) zeros--;
-      if (zeros == 0) return count; } }
-
+      if (zeros == 0) {
+	  //	  printf("Processed line %d %c.  Length = %d\n", litList[0], litList[1], litCount);
+	  return litCount; }
+    }
+  }
   return 0; }
 
 int main (int argc, char** argv) {
@@ -211,6 +227,10 @@ int main (int argc, char** argv) {
   int i, nVar = 0, nCls = 0;
   char ignore[1024];
   FILE* cnf   = fopen (argv[1], "r");
+  if (!cnf) {
+      printf("Couldn't open file '%s'\n", argv[1]);
+      exit(1);
+  }
   for (;;) {
     fscanf (cnf, " p cnf %i %i ", &nVar, &nCls);
     if (nVar > 0) break;
@@ -227,12 +247,14 @@ int main (int argc, char** argv) {
   tableAlloc = nCls * 2;
   table = (int *) malloc (sizeof(int) * tableAlloc);
 
-  int* list = (int*) malloc (sizeof (int) * nVar * 10);
+  litAlloc = nVar * 10;
+  litList = (int*) malloc (sizeof (int) * litAlloc);
+  
   int index = 1;
   while (1) {
-    int size = parseLine (cnf, list, CNF);
+    int size = parseLine (cnf, CNF);
     if (size == 0) break;
-    addClause (index++, list, size); }
+    addClause (index++, litList, size); }
   fclose (cnf);
 
   printf ("c parsed a formula with %i variables and %i clauses\n", nVar, nCls);
@@ -242,22 +264,26 @@ int main (int argc, char** argv) {
   for (i = 0; i < maskAlloc; i++) mask[i] = 0;
 
   FILE* proof = fopen (argv[2], "r");
+  if (!proof) {
+      printf("Couldn't open file '%s'\n", argv[2]);
+      exit(1);
+  }
   int mode = LRAT;
   while (1) {
-    int size = parseLine (proof, list, mode);
+    int size = parseLine (proof, mode);
     if (size == 0) break;
 
-    if (getType (list) == (int) 'd') {
-      deleteClauses (list + 2); }
-    else if (getType (list) == (int) 'a') {
-      int  index  = getIndex  (list);
-      int  length = getLength (list);
-      int* hints  = getHints  (list);
+    if (getType (litList) == (int) 'd') {
+      deleteClauses (litList + 2); }
+    else if (getType (litList) == (int) 'a') {
+      int  index  = getIndex  (litList);
+      int  length = getLength (litList);
+      int* hints  = getHints  (litList);
 
-      if (checkClause (list + 2, length, hints) == SUCCESS) {
-        addClause (index, list + 2, length); }
+      if (checkClause (litList + 2, length, hints) == SUCCESS) {
+        addClause (index, litList + 2, length); }
       else {
-        printf("c failed to check clause: "); printClause (list + 2);
+        printf("c failed to check clause: "); printClause (litList + 2);
         printf("c NOT VERIFIED\n");
         return_code = 1;
       }
