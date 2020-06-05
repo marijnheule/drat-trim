@@ -40,7 +40,7 @@ long long deleted_clauses = 0;
 long long live_clauses = 0;
 long long max_live_clauses = 0;
 
-long long *mask, now;
+long long *mask, *intro, now;
 
 int *clsList, clsAlloc, clsLast;
 int *table, tableSize, tableAlloc, maskAlloc;
@@ -59,6 +59,7 @@ void printClause (int* clause) {
 
 int checkRedundancy (int pivot, int start, int *hints, long long thisMask) {
   int res = abs(*hints++);
+  assert (start <= res);
 
   if (res != 0) {
     while (start < res) {
@@ -67,7 +68,7 @@ int checkRedundancy (int pivot, int start, int *hints, long long thisMask) {
         while (*clause) {
           int clit = convertLit (*clause++);
           if (clit == (pivot^1)) return FAILED; } } }
-    if (clsList[res] == DELETED) { printf ("c ERROR: using DELETE clause\n"); exit (2); };
+    if (clsList[res] == DELETED) { printf ("c ERROR: using DELETED clause\n"); exit (2); };
     int flag = 0, *clause = table + clsList[res];
     while (*clause) {
       int clit = convertLit (*clause++);
@@ -79,7 +80,7 @@ int checkRedundancy (int pivot, int start, int *hints, long long thisMask) {
     if (flag == 0) return FAILED; }
 
   while (*hints > 0) {
-    if (clsList[*hints] == DELETED) { printf ("c ERROR: using DELETE clause\n"); exit (2); };
+    if (clsList[*hints] == DELETED) { printf ("c ERROR: using DELETED clause\n"); exit (2); };
     int unit = 0, *clause = table + clsList[*(hints++)];
     while (*clause) {
       int clit = convertLit (*(clause++));
@@ -95,22 +96,27 @@ int checkRedundancy (int pivot, int start, int *hints, long long thisMask) {
 
 int checkClause (int* list, int size, int* hints) {
   now++;
-  int i, pivot = convertLit (list[0]);
+  int i, j, pivot = convertLit (list[0]);
   int RATs = getRATs (hints + 1);
   for (i = 0; i < size; i++) {
     int clit = convertLit (list[i]);
     if (clit >= maskAlloc) {
+      int old = maskAlloc;
       maskAlloc = (clit * 3) >> 1;
 //      printf("c realloc mask to %i\n", maskAlloc);
-      mask = (long long *) realloc (mask, sizeof (long long) * maskAlloc);
-      if (mask == NULL) exit(0); }
+      mask  = (long long *) realloc (mask,  sizeof (long long) * maskAlloc);
+      intro = (long long *) realloc (intro, sizeof (long long) * maskAlloc);
+      if (!mask || !intro) { printf ("c Memory allocation failure\n"); exit (1); }
+      for (j = old; j < maskAlloc; j++) mask[j] = intro[j] = 0; }
     mask [clit] = now + RATs; }
 
   int res = checkRedundancy (pivot, 0, hints, now + RATs);
   if (res  == FAILED) return FAILED;
   if (RATs == 0)      return SUCCESS;
 
-  int start = 1;
+  int start = intro[pivot ^ 1];
+  if (start == 0) return SUCCESS;
+//  int start = 1;
   while (1) {
     hints++; now++; while (*hints > 0) hints++;
     if (*hints == 0) break;
@@ -138,7 +144,10 @@ void addClause (int index, int* literals, int size) {
     table = (int*) realloc (table, sizeof (int) * tableAlloc); }
 
   clsList[index] = tableSize;
-  int i; for (i = 0; i < size; i++) table[tableSize++] = literals[i];
+  int i; for (i = 0; i < size; i++) {
+    int clit = convertLit (literals[i]);
+    if (intro[clit] == 0) intro[clit] = index;
+    table[tableSize++] = literals[i]; }
   table[tableSize++] = 0;
   clsLast = index;
   added_clauses++;
@@ -152,10 +161,10 @@ void deleteClauses (int* list) {
     int index = *list++;
     if (clsList[index] == DELETED) {
       printf ("c WARNING: clause %i is already deleted\n", index); }
-    clsList[index] = DELETED; 
+    clsList[index] = DELETED;
     deleted_clauses++;
     live_clauses--;
-  } 
+  }
 }
 
 static void addLit(int lit) {
@@ -183,6 +192,9 @@ int parseLine (FILE* file, int mode) {
     while (1) {
       tmp = fscanf (file, " %i ", &lit);
       if (tmp == 0 || tmp == EOF) return 0;
+      int clit = convertLit (lit);
+      if (intro[clit] == 0)
+        intro[clit] = 1;
       addLit(lit);
       if (lit == 0) return litCount; } }
 
@@ -249,7 +261,12 @@ int main (int argc, char** argv) {
 
   litAlloc = nVar * 10;
   litList = (int*) malloc (sizeof (int) * litAlloc);
-  
+
+  maskAlloc = 20 * nVar;
+  mask  = (long long*) malloc (sizeof(long long) * maskAlloc);
+  intro = (long long*) malloc (sizeof(long long) * maskAlloc);
+  for (i = 0; i < maskAlloc; i++) mask[i] = intro[i] = 0;
+
   int index = 1;
   while (1) {
     int size = parseLine (cnf, CNF);
@@ -258,10 +275,6 @@ int main (int argc, char** argv) {
   fclose (cnf);
 
   printf ("c parsed a formula with %i variables and %i clauses\n", nVar, nCls);
-
-  maskAlloc = 20 * nVar;
-  mask = (long long*) malloc (sizeof(long long) * maskAlloc);
-  for (i = 0; i < maskAlloc; i++) mask[i] = 0;
 
   FILE* proof = fopen (argv[2], "r");
   if (!proof) {
