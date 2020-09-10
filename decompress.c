@@ -39,15 +39,12 @@ int read_lit (FILE* input, int *lit) {
 
 int main (int argc, char** argv) {
 
-  if (argc <= 2) {
-    printf("c %s needs two arguments: an input and an output file\n", argv[0]);
+  if (argc <= 1) {
+    printf("c %s needs one argument: an input in compressed LRAT format\n", argv[0]);
     return 0; }
 
   FILE *input  = fopen (argv[1], "r");
   if (input == NULL) { printf ("c ERROR opening %s\n", argv[1]); exit (1); }
-
-  FILE *output = fopen (argv[2], "w");
-  if (output == NULL) { printf ("c ERROR opening %s\n", argv[2]); exit (2); }
 
   int lit, index;
 

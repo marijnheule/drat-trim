@@ -22,9 +22,14 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <stdlib.h>
 
 #define EMPTY	-1
+#define INIT	1000
 
 long long table_size, table_alloc, *lookup;
 int lookup_size, lookup_alloc, *table;
+
+
+int abscompare (const void *a, const void *b) {
+  return (abs(*(int*)a) - abs(*(int*)b)); }
 
 void write_lit (FILE *output, int lit, int sort) {
   if (sort == 0) {
@@ -57,16 +62,26 @@ int main (int argc, char** argv) {
 
   if (sort) {
     lookup_size  =    0;
-    lookup_alloc = 1000;
+    lookup_alloc = INIT;
     lookup = (long long*) malloc (sizeof (long long) * lookup_alloc);
     for (i = 0; i < lookup_alloc; i++) lookup[i] = EMPTY;
     table_size   =    0;
-    table_alloc  = 1000;
+    table_alloc  = INIT;
     table = (int*) malloc (sizeof (int) * table_alloc); }
 
   while (1) {
     tmp = fscanf (input ," %i ", &line);
     if (tmp == EOF) break;
+
+    if (tmp == 0) {
+      char ignore[1<<16];
+      if (fgets (ignore, sizeof (ignore), input) == NULL) printf ("c\n");
+      for (i = 0; i < sizeof ignore; i++) { if (ignore[i] == '\n') break; }
+      if (i == sizeof ignore) {
+        printf ("c ERROR: comment longer than %zu characters: %s\n", sizeof ignore, ignore);
+        exit (3); }
+      continue; }
+
     if (tmp) size++;
     if (size == 1) {
       tmp = fscanf (input, " %i ", &lit);
@@ -91,7 +106,9 @@ int main (int argc, char** argv) {
 
     if (line == 0 && del == 1) size = 0;
     if (line == 0 && del == 0) del  = 1; }
+
   fclose (input);
+
   if (sort == 0) return 1;
 
   for (i = 1; i <= lookup_size; i++) {
@@ -100,8 +117,23 @@ int main (int argc, char** argv) {
     if (i % 2) { fputc ('d', output); zeros = 1; }
     else       { fputc ('a', output); zeros = 2; }
     int *list = table + lookup[i];
-    while (zeros) {
+
+    if (zeros == 2) {
+      write_lit (output, *list++, 0); // write index;
+      if (*list) write_lit (output, *list++, 0); // write pivot;
+
+      int* start = list; int count = 0;
+      while (*list) { count++; list++; }
+      qsort (start, count, sizeof (int), abscompare);
+
+      list = start;
       while (*list) write_lit (output, *list++, 0);
       write_lit (output, *list++, 0);
-      zeros--; } }
+      zeros--;
+    }
+
+    if (zeros == 1) {
+      while (*list) write_lit (output, *list++, 0);
+      write_lit (output, *list++, 0); }
+  }
 }
