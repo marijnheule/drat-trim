@@ -40,7 +40,7 @@ long long deleted_clauses = 0;
 long long live_clauses = 0;
 long long max_live_clauses = 0;
 
-long long *mask, *intro, now;
+long long *mask, *intro, now, lastIndex;
 
 int *clsList, clsAlloc, clsLast;
 int *table, tableSize, tableAlloc, maskAlloc;
@@ -87,7 +87,7 @@ int checkRedundancy (int pivot, int start, int *hints, long long thisMask) {
       if (unit != 0) return FAILED;
       unit = clit; }
     if (unit == 0) return SUCCESS;
-    if (mask[unit^1] == thisMask) printf ("c WARNING unit already fixed to true\n");
+    if (mask[unit^1] == thisMask) printf ("c WARNING unit already fixed to true on clause with index %lli\n", lastIndex);
     mask[unit^1] = thisMask; }
 
   if (res == 0) return SUCCESS;
@@ -301,6 +301,7 @@ int main (int argc, char** argv) {
       deleteClauses (litList + 2, drat); }
     else if (getType (litList) == (int) 'a') {
       int  index  = getIndex  (litList);
+      lastIndex = index;
       int  length = getLength (litList);
       int* hints  = getHints  (litList);
 
