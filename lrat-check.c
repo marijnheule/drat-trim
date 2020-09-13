@@ -112,7 +112,20 @@ int checkClause (int* list, int size, int* hints) {
   if (res  == FAILED) return FAILED;
   if (RATs == 0)      return SUCCESS;
 
+
   int start = intro[pivot ^ 1];
+  int flag  = 1;
+  while (start > 1 && flag) {
+    if (clsList[start] != DELETED) {
+      int *clause = table + clsList[start];
+      while (*clause) {
+        int clit = convertLit (*clause++);
+        if (clit == (pivot^1)) flag = 0; } }
+    if (start == clsLast) { start = 0; flag = 0; }
+    if (flag) start++; }
+
+  intro[pivot ^ 1] = start;
+
   if (start == 0) return SUCCESS;
   while (1) {
     hints++; now++; while (*hints > 0) hints++;
@@ -172,15 +185,14 @@ void deleteClauses (int* list, FILE* drat) {
   }
 }
 
-static void addLit(int lit) {
+static void addLit (int lit) {
   if (litCount >= litAlloc) {
     litAlloc = (litAlloc * 3) >> 1;
     litList = (int*) realloc (litList, sizeof (int) * litAlloc); }
-  litList[litCount++] = lit;
-}
+  litList[litCount++] = lit; }
 
-int parseLine (FILE* file, int mode) {
-  int lit, index, tmp;
+int parseLine (FILE* file, int mode, int line) {
+  int lit, tmp;
   litCount = 0;
   char c = 0;
   while (1) {
@@ -193,25 +205,27 @@ int parseLine (FILE* file, int mode) {
       tmp = fscanf (file, "%c", &c); } }
 
   if (mode == CNF) {
+    line++;
     while (1) {
       tmp = fscanf (file, " %i ", &lit);
       if (tmp == 0 || tmp == EOF) return 0;
       int clit = convertLit (lit);
       if (intro[clit] == 0)
-        intro[clit] = 1;
-      addLit(lit);
+        intro[clit] = line;
+      addLit (lit);
       if (lit == 0) return litCount; } }
 
   if (mode == LRAT) {
+    int index;
     int zeros = 2;
     tmp = fscanf (file, " %i ", &index);
     if (tmp == 0 || tmp == EOF) return 0;
-    addLit(index);
+    addLit (index);
 
     tmp = fscanf (file, " d %i ", &lit);
     if (tmp == 1) {
-      addLit((int) 'd');
-      addLit(lit);
+      addLit ((int) 'd');
+      addLit (lit);
       zeros--;
       if (lit   == 0) zeros--;
       if (zeros == 0) {
@@ -273,7 +287,7 @@ int main (int argc, char** argv) {
 
   int index = 1;
   while (1) {
-    int size = parseLine (cnf, CNF);
+    int size = parseLine (cnf, CNF, index);
     if (size == 0) break;
     addClause (index++, litList, size, NULL); }
   fclose (cnf);
@@ -294,7 +308,7 @@ int main (int argc, char** argv) {
 
   int mode = LRAT;
   while (1) {
-    int size = parseLine (proof, mode);
+    int size = parseLine (proof, mode, index);
     if (size == 0) break;
 
     if (getType (litList) == (int) 'd') {
