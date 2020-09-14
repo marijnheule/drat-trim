@@ -99,32 +99,29 @@ int checkClause (int* list, int size, int* hints) {
   int RATs = getRATs (hints + 1);
   for (i = 0; i < size; i++) {
     int clit = convertLit (list[i]);
-    if (clit >= maskAlloc) {
-      int old = maskAlloc;
+    if (clit >= maskAlloc) { // in case we encountered a new literal
+      int old = maskAlloc;  // need to set intro?
       maskAlloc = (clit * 3) >> 1;
       mask  = (long long *) realloc (mask,  sizeof (long long) * maskAlloc);
       intro = (long long *) realloc (intro, sizeof (long long) * maskAlloc);
       if (!mask || !intro) { printf ("c Memory allocation failure\n"); exit (1); }
       for (j = old; j < maskAlloc; j++) mask[j] = intro[j] = 0; }
-    mask [clit] = now + RATs; }
+    mask [clit] = now + RATs; } // mark all literals in lemma with mask
 
   int res = checkRedundancy (pivot, 0, hints, now + RATs);
   if (res  == FAILED) return FAILED;
   if (RATs == 0)      return SUCCESS;
 
-
+  int *first = hints; first++; while (*first > 0) first++;
   int start = intro[pivot ^ 1];
-  int flag  = 1;
-  while (start > 1 && flag) {
+  while (start < -first[0]) {
     if (clsList[start] != DELETED) {
       int *clause = table + clsList[start];
       while (*clause) {
         int clit = convertLit (*clause++);
-        if (clit == (pivot^1)) flag = 0; } }
-    if (start == clsLast) { start = 0; flag = 0; }
-    if (flag) start++; }
-
-  intro[pivot ^ 1] = start;
+        if (clit == (pivot^1)) return FAILED; } }
+    start++; }
+  intro[pivot ^ 1] = -first[0];
 
   if (start == 0) return SUCCESS;
   while (1) {
