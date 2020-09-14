@@ -127,6 +127,7 @@ int checkClause (int* list, int size, int* hints) {
   while (1) {
     hints++; now++; while (*hints > 0) hints++;
     if (*hints == 0) break;
+    assert (-hints[0] >= start);
     if (checkRedundancy (pivot, start, hints, now) == FAILED) return FAILED;
     start = abs(*hints) + 1; }
 
