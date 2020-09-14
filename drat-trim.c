@@ -1,7 +1,7 @@
 /************************************************************************************[drat-trim.c]
 Copyright (c) 2014 Marijn Heule and Nathan Wetzler, The University of Texas at Austin.
 Copyright (c) 2015-2020 Marijn Heule, Carnegie Mellon University
-Last edit: June 1, 2020
+Last edit: September 11, 2020
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -527,13 +527,9 @@ void printDependencies (struct solver *S, int* clause, int RATflag) {
     int i;
     clause[MAXDEP] = 0;
     for (i = 0; i < S->nDependencies; i++) {
-//      printf ("%i ", S->dependencies[i]);
       if (S->dependencies[i] > clause[MAXDEP])
         clause[MAXDEP] = S->dependencies[i]; }
-//    printf("\n%i :", clause[MAXDEP]);
-//    printClause(clause);
-    assert (clause[MAXDEP] < clause[ID]);
-  }
+    assert (clause[MAXDEP] < clause[ID]); }
 
   printDependenciesFile (S, clause, RATflag, 0);
   printDependenciesFile (S, clause, RATflag, 1); }
@@ -602,167 +598,6 @@ int checkRAT (struct solver *S, int pivot, int mark) {
     return FAILED; }
 
   return SUCCESS; }
-
-int setUCP (struct solver *S, int *cnf, int *trail) {
-  int touched = 0, satisfied = 1;
-  int *clause = cnf;
-
-  while (*clause) {
-    int *literals = clause;
-    int unit = 0, sat = 0, und = 0;
-    int i;
-    while (*literals) {
-      int lit = *literals++;
-      if (S->setTruth[ lit ] == 1) { sat = 1; }
-      if (S->setTruth[ lit ] == 0) { und++; unit = lit; } }
-    clause = literals + 1;
-    if (!sat && und == 1) {
-      sat = 1;
-      touched = 1;
-      *trail++ = unit;
-      *trail   = 0;
-      if (S->verb) printf("c found unit %i\n", unit);
-      S->setTruth[ unit] =  1;
-      S->setTruth[-unit] = -1; }
-    satisfied &= sat;
-    if (!sat && !und) return FAILED; }
-
-  *trail = 0;
-  if (satisfied) return SUCCESS;
-  if ( touched ) return setUCP (S, cnf, trail);
-  return FIXPOINT; }
-
-/*
-int setDLL (struct solver *S, int *cnf, int *trail) {
-  int res = setUCP (S, cnf, trail);
-  if (res == SUCCESS) return SUCCESS;
-  if (res == FAILED ) return FAILED;
-  while (*trail) trail++;
-
-  int decision = 1;
-  while (S->setTruth[decision]) decision++;
-
-  *trail++ = decision;
-  *trail   = 0;
-  S->setTruth[ decision] =  1;
-  S->setTruth[-decision] = -1;
-
-  if (S->verb) printf("c branch on %i\n", decision);
-  if (setDLL (S, cnf, trail) == SUCCESS) return SUCCESS;
-
-  while (*trail) trail++;
-  while (*trail != decision) {
-    S->setTruth[ *trail] = 0;
-    S->setTruth[-*trail] = 0;
-    trail--; }
-
-  *trail++ = -decision;
-  *trail = 0;
-  S->setTruth[ decision] = -1;
-  S->setTruth[-decision] =  1;
-
-  if (S->verb) printf("c branch on %i\n", -decision);
-  return setDLL (S, cnf, trail); }
-
-int setRedundancyCheck (struct solver *S, int *clause, int size, int uni) {
-  int i, j, blocked, nSPR = 0;
-  long int reason;
-
-  int *trail = (int*) malloc (sizeof(int) * (size + 1));
-
-  if (S->verb) printf("c starting SPR check\n");
-
-  for (i = 1; i <= size; i++) {
-    trail            [i - 1]  =  0;
-    S->setMap[ clause[i - 1]] =  i;
-    S->setMap[-clause[i - 1]] = -i; }
-
-  // Loop over all literals to calculate resolution candidates
-  for (i = -S->maxVar; i <= S->maxVar; i++) {
-    if (i == 0) continue;
-    // Loop over all watched clauses for literal
-    for (j = 0; j < S->used[i]; j++) {
-      int* watchedClause = S->DB + (S->wlist[i][j] >> 1);
-      if (*watchedClause == i) { // If watched literal is in first position
-        int flag = 0;
-        blocked = 0;
-        reason = 0;
-        while (*watchedClause) {
-          int lit = *watchedClause++;
-          if (S->setMap[lit] < 0) flag = 1;
-          else if (!S->setMap[lit] && S->falseA[-lit]) {
-            if (blocked == 0 || reason > S->reason[ abs(lit) ])
-              blocked = lit, reason = S->reason[ abs(lit) ]; } }
-
-       if (blocked != 0 && reason != 0 && flag == 1) {
-         analyze (S, S->DB + reason, -1); S->reason[abs(blocked)] = 0; }
-
-       // If resolution candidate, add to list
-       if (blocked == 0 && flag == 1) {
-         if (nSPR == S->maxRAT) {
-           S->maxRAT = (S->maxRAT * 3) >> 1;
-           S->RATset = realloc(S->RATset, sizeof(int) * S->maxRAT); }
-         S->RATset[nSPR++] = S->wlist[i][j] >> 1; } } } }
-
-  // Check all candidates for RUP
-  int cnfSize = size + 2; // first clause + terminating zero
-  int filtered = 0;
-  for (i = 0; i < nSPR; i++) {
-    int inSet = 1;
-    int* candidate = S->DB + S->resolutionCandidates[i];
-    if (S->verb) {
-      printf("c candidate: "); printLiterals (candidate); }
-    while (*candidate) { int lit = *candidate++;
-      if (S->setMap[lit]) inSet++;
-      if (!S->setMap[lit] && !S->falseA[lit]) {
-        ASSIGN(-lit); S->reason[abs(lit)] = 0; } }
-    if (propagate (S, 0) == SAT) {
-      if (S->verb) printf(" FAILED\n");
-      cnfSize += inSet;
-      S->processed = S->forced;
-      while (S->forced < S->assigned) S->falseA[*(--S->assigned)] = 0;
-      S->resolutionCandidates[filtered++] = S->resolutionCandidates[i]; }
-    else {
-      if (S->verb) printf(" SUCCESS\n"); } }
-
-  int *cnf = (int*) malloc (sizeof(int) * cnfSize);
-  int *tmp = cnf;
-  for (i = 1; i <= size; i++) *tmp++ = i;
-  *tmp++ = 0;
-  numCandidates = filtered;
-  for (i = 0; i < numCandidates; i++) {
-    int* candidate = S->DB + S->resolutionCandidates[i];
-    while (*candidate) {
-      int lit = *candidate++;
-      if (S->setMap[lit]) *tmp++ = S->setMap[lit]; }
-    *tmp++ = 0; }
-  *tmp++ = 0;
-
-  if (S->verb) {
-    tmp = cnf;
-    printf("c printing CNF:\n");
-    while (*tmp) {
-      int *clause = tmp;
-      printf("c ");
-      while (*clause) printf("%i ", *clause++);
-      printf("\n");
-      tmp = clause + 1; } }
-
-  int res = setDLL (S, cnf, trail);
-  if (S->verb) {
-    if (res == SUCCESS) printf("c SUCCESS\n");
-    if (res == FAILED ) printf("c FAILED\n"); }
-
-  for (i = 1; i <= size; i++) {
-    S->setMap[ clause[i - 1]] = 0;
-    S->setMap[-clause[i - 1]] = 0;
-    S->setTruth[  i ]         = 0;
-    S->setTruth[ -i ]         = 0; }
-
-  free(trail);
-  free( cnf );
-  return res; }
-*/
 
 int redundancyCheck (struct solver *S, int *clause, int size, int mark) {
   int i, indegree;
@@ -1093,24 +928,7 @@ int verify (struct solver *S, int begin, int end) {
 
     if (S->verb) {
       printf ("\rc validating clause (%i, %i):  ", clause[PIVOT], size); printClause (clause); }
-/*
-    int i;
-    if (size > 1 && (top_flag == 1)) {
-      int last = clause[size - 1];
-      int pivot = clause[PIVOT];
-      for (i = 0; i < size; i++) {
-        int tmp = clause[i];
-        clause[i] = last;
-        clause[size - 1] = 0;
-        if (tmp == pivot) clause[PIVOT] = clause[0];
-        if (redundancyCheck (S, clause, size - 1, 0) != FAILED) {
-          top_flag = 0;
-          size = size - 1; break; }
-        else {
-          clause[i] = tmp;
-          clause[size - 1] = last; }
-        clause[PIVOT] = pivot; } }
-*/
+
     if (redundancyCheck (S, clause, size, 1) == FAILED) {
       printf ("c failed at proof line %i (modulo deletion errors)\n", step + 1);
       return SAT; }
@@ -1455,18 +1273,12 @@ int parse (struct solver* S) {
   return retvalue; }
 
 void freeMemory (struct solver *S) {
-  int i;
-//  printf("c database size %li; ", S->mem_used);
-//  int sum = 0;
-//  for (i = 1; i <= S->maxVar; i++)
-//    sum += S->max[i] + S->max[-i];
-//  printf(" watch pointers size %i.\n", sum);
-
   free (S->DB);
   free (S->falseStack);
   free (S->reason);
   free (S->proof);
   free (S->formula);
+  int i;
   for (i = 1; i <= S->maxVar; ++i) { free (S->wlist[i]); free (S->wlist[-i]); }
   free (S->used   - S->maxVar);
   free (S->max    - S->maxVar);
