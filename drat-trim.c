@@ -102,6 +102,7 @@ static inline void removeWatch (struct solver* S, int* clause, int index) {
       S->wlist[lit][ S->used[lit] ] = END; return; } } }
 
 static inline void addUnit (struct solver* S, long index) {
+//  printf("c adding unit %i\n", S->DB[index]);
   S->unitStack[S->unitSize++] = index; }
 
 static inline void removeUnit (struct solver* S, int lit) {
@@ -781,6 +782,8 @@ int verify (struct solver *S, int begin, int end) {
           if (S->verb) { printf("c removing proof step: d "); printClause(lemmas); }
           S->proof[step] = 0; continue; } }
       else {
+//        printf ("c unit %i\n", lit);
+        if (S->falseA[-lit]) S->reason[abs(lit)] = (lemmas - S->DB) + 1;
         if (S->mode == BACKWARD_UNSAT && S->falseA[-lit]) { S->proof[step] = 0; continue; }
         else { addUnit (S, (long) (lemmas - S->DB)); } } }
 
