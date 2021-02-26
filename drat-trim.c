@@ -57,7 +57,7 @@ struct solver { FILE *inputFile, *proofFile, *lratFile, *traceFile, *activeFile;
     int *DB, nVars, timeout, mask, delete, *falseStack, *falseA, *forced, binMode, optimize, binOutput,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, nActive, *lratTable,
       nLemmas, maxRAT, *RATset, *preRAT, maxDependencies, nDependencies, bar, backforce, reduce,
-      *dependencies, maxVar, maxSize, mode, verb, unitSize, prep, *current, nRemoved, warning,
+      *dependencies, maxVar, maxSize, mode, verb, unitSize, unitStackSize, prep, *current, nRemoved, warning,
       delProof, *setMap, *setTruth;
     char *coreStr, *lemmaStr;
     struct timeval start_time;
@@ -103,6 +103,9 @@ static inline void removeWatch (struct solver* S, int* clause, int index) {
 
 static inline void addUnit (struct solver* S, long index) {
 //  printf("c adding unit %i\n", S->DB[index]);
+  if (S->unitSize >= S->unitStackSize) {
+    S->unitStackSize = (S->unitStackSize * 3) >> 1;
+    S->unitStack = (long*) realloc (S->unitStack, sizeof(long) * S->unitStackSize); }
   S->unitStack[S->unitSize++] = index; }
 
 static inline void removeUnit (struct solver* S, int lit) {
@@ -1274,7 +1277,8 @@ int parse (struct solver* S) {
                              S->wlist   [ i] = (long*) malloc (sizeof (long) * S->max[ i]);
                              S->wlist   [-i] = (long*) malloc (sizeof (long) * S->max[-i]); }
 
-  S->unitStack = (long *) malloc (sizeof (long) * n);
+  S->unitStackSize = INIT;
+  S->unitStack = (long *) malloc (sizeof (long) * S->unitStackSize);
 
   return retvalue; }
 
