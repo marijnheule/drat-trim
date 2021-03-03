@@ -786,7 +786,7 @@ int verify (struct solver *S, int begin, int end) {
           S->proof[step] = 0; continue; } }
       else {
 //        printf ("c unit %i\n", lit);
-        if (S->falseA[-lit]) S->reason[abs(lit)] = (lemmas - S->DB) + 1;
+//        if (S->falseA[-lit]) S->reason[abs(lit)] = (lemmas - S->DB) + 1;
         if (S->mode == BACKWARD_UNSAT && S->falseA[-lit]) { S->proof[step] = 0; continue; }
         else { addUnit (S, (long) (lemmas - S->DB)); } } }
 
@@ -794,9 +794,9 @@ int verify (struct solver *S, int begin, int end) {
       if ((S->reason[abs (lemmas[0])] - 1) == (lemmas - S->DB)) { // what is this check?
         if (S->mode != FORWARD_SAT) { // ignore pseudo unit clause deletion
           if (S->warning != NOWARNING) {
-            printf ("\rc WARNING: ignoring deletion instruction %li: ", (lemmas - S->DB)); printClause (lemmas); }
+            if (S->verb) { printf ("\rc WARNING: ignoring deletion instruction %li: ", (lemmas - S->DB)); printClause (lemmas); } }
           if (S->warning == HARDWARNING) exit (HARDWARNING);
-//          if (S->verb) { printf ("c ignoring deletion instruction %li: ", (lemmas - S->DB)); printClause (lemmas); }
+          if (S->verb) { printf ("c ignoring deletion instruction %li: ", (lemmas - S->DB)); printClause (lemmas); }
 //        if (S->mode == BACKWARD_UNSAT) { // ignore pseudo unit clause deletion
           S->proof[step] = 0; }
         else { // if (S->mode == FORWARD_SAT) { // also for FORWARD_UNSAT?
