@@ -1121,7 +1121,8 @@ int parse (struct solver* S) {
     if (tmp == 0) {
       char ignore[1<<16];
       if (!fileSwitchFlag) { if (fgets (ignore, sizeof (ignore), S->inputFile) == NULL) printf ("c\n"); }
-      else if (fgets (ignore, sizeof (ignore), S->proofFile) == NULL) printf ("c\n");
+      else                   if (fgets (ignore, sizeof (ignore), S->proofFile) == NULL) printf ("c\n");
+      if (ignore[0] != 'c') continue;
       for (i = 0; i < sizeof ignore; i++) { if (ignore[i] == '\n') break; }
       if (i == sizeof ignore) {
         printf ("c ERROR: comment longer than %zu characters: %s\n", sizeof ignore, ignore);
