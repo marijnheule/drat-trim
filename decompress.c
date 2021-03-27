@@ -24,6 +24,10 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define ADD	-48
 #define DEL	50
 
+
+#define MODE	1	// DRAT: MODE=1; LRAT: MODE=2
+
+
 int read_lit (FILE* input, int *lit) {
   int l = 0, lc, shift = 0;
   do {
@@ -48,6 +52,7 @@ int main (int argc, char** argv) {
 
   int lit, index;
 
+
   while (1) {
     read_lit (input, &lit);
     if (lit == ADD) {
@@ -55,14 +60,15 @@ int main (int argc, char** argv) {
       read_lit (input, &lit);
       index = lit;
       printf ("%i ", index);
-      while (zeros < 2) {
+      while (zeros < MODE) {
         read_lit (input, &lit);
         if (lit == 0) zeros++;
-        if (zeros == 2) printf ("0\n");
+        if (zeros == MODE) printf ("0\n");
         else printf ("%i ", lit); }
     }
     else if (lit == DEL) {
-      printf ("%i d ", index);
+      if (MODE == 2) printf ("%i ", index);
+      printf ("d ");
       int zeros = 0;
       while (zeros < 1) {
         read_lit (input, &lit);
