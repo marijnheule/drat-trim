@@ -259,13 +259,13 @@ int main (int argc, char** argv) {
       printf("Couldn't open file '%s'\n", argv[1]);
       exit(1); }
 
-  for (;;) {
-    fscanf (cnf, " p cnf %i %i ", &nVar, &nCls);
-    if (nVar > 0) break;
+  while (fscanf (cnf, " p cnf %i %i ", &nVar, &nCls) != 2) {
     fgets (ignore, sizeof (ignore), cnf);
     int j; for (j = 0; j < 1024; j++) { if (ignore[j] == '\n') break; }
     if (j == 1024) {
       printf ("c ERROR: comment longer than 1024 characters: %s\n", ignore); exit (0); } }
+
+  if (nVar <= 0) nVar = 1;
 
   clsAlloc = nCls * 2;
   clsList  = (int*) malloc (sizeof(int) * clsAlloc);
