@@ -24,6 +24,8 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <assert.h>
 #include <sys/time.h>
 
+#define PARTIALPROOF
+
 #define TIMEOUT     40000
 #define BIGINIT     1000000
 #define INIT        4
@@ -148,6 +150,9 @@ static inline void markClause (struct solver* S, int* clause, int index) {
   if ((clause[index + ID] & ACTIVE) == 0) {
     S->nActive++;
     clause[index + ID] |= ACTIVE;
+//#ifdef PARTIALPROOF
+//    if ((clause + index) > (S->DB + S->firstLemma))  // don't delete original clauses
+//#endif
     if ((S->mode == BACKWARD_UNSAT) && clause[index + 1]) {
       S->optproof[S->nOpt++] = (((long) (clause - S->DB) + index) << INFOBITS) + 1; }
     if (clause[1 + index] == 0) return;
@@ -164,12 +169,14 @@ void analyze (struct solver* S, int* clause, int index) {     // Mark all clause
         markClause (S, S->DB + S->reason[abs (lit)], -1);
         if (S->assigned >= S->forced)
           S->reason[abs (lit)] = 0; } }
+#ifndef PARTIALPROOF
     else if (S->falseA[lit] == ASSUMED && !S->RATmode && S->reduce && !S->lratFile) { // Remove unused literal
       S->nRemoved++;
       int *tmp = S->current;
       while (*tmp != lit) tmp++;
       while (*tmp) { tmp[0] = tmp[1]; tmp++; }
       tmp[-1] = 0; }
+#endif
     if (S->assigned >= S->forced) S->reason[abs (lit)] = 0;
     S->falseA[lit] = (S->assigned < S->forced); }
 
@@ -855,11 +862,12 @@ int verify (struct solver *S, int begin, int end) {
         long ad = S->proof[s];
         int *clause = S->DB + (ad >> INFOBITS);
         if (sortSize(S, clause) >= 0) {
-          if ( (ad & 1) && (clause[ID] & 1)) clause[ID] ^= ACTIVE;
-          if (!(ad & 1))                     clause[ID] |= ACTIVE; } } }
+          if ( (ad & 1) && (clause[ID] & ACTIVE)) clause[ID] ^= ACTIVE;
+          if (!(ad & 1))                          clause[ID] |= ACTIVE; } } }
     if (!S->backforce) {
       printf ("\rc ERROR: no conflict\n");
-      return SAT; } }
+//      return SAT;
+    } }
 
   start_verification:;
   if (S->mode == FORWARD_UNSAT) {
@@ -1081,6 +1089,7 @@ int parse (struct solver* S) {
     hashTable[i] = (long*) malloc (sizeof (long) * hashMax[i]); }
 
   int fileSwitchFlag = 0;
+  int finalClause = 0;
   size = 0;
   while (1) {
     int lit = 0; tmp = 0;
@@ -1186,6 +1195,7 @@ int parse (struct solver* S) {
       int *clause = &S->DB[S->mem_used + EXTRA - 1];
       if (size != 0) clause[PIVOT] = pivot;
       clause[ID] = 2 * S->count; S->count++;
+      finalClause = S->mem_used + EXTRA - 1;
       if (S->mode == FORWARD_SAT) if (nZeros > 0) clause[ID] |= ACTIVE;
 
       for (i = 0; i < size; ++i) { clause[ i ] = buffer[ i ]; } clause[ i ] = 0;
@@ -1239,6 +1249,9 @@ int parse (struct solver* S) {
   free (hashUsed);
   free (hashMax);
   free (buffer);
+
+  int *clause = &S->DB[finalClause];
+  clause[ID] |= ACTIVE; // temporary
 
   printf ("\rc finished parsing");
   if (S->nReads) printf (", read %li bytes from proof file", S->nReads);

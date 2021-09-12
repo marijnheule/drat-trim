@@ -114,7 +114,7 @@ int checkClause (int* list, int size, int* hints) {
 
   int *first = hints; first++; while (*first > 0) first++;
   int start = intro[pivot ^ 1];
-  while (start < -first[0]) {
+  while (start < -first[0]) {  // check whether no clause before -first[0] has -pivot.
     if (clsList[start] != DELETED) {
       int *clause = table + clsList[start];
       while (*clause) {
@@ -127,6 +127,7 @@ int checkClause (int* list, int size, int* hints) {
   while (1) {
     hints++; now++; while (*hints > 0) hints++;
     if (*hints == 0) break;
+    if (-hints[0] < start) printf ("c %i %i\n", -hints[0], start);
     assert (-hints[0] >= start);
     if (checkRedundancy (pivot, start, hints, now) == FAILED) return FAILED;
     start = abs(*hints) + 1; }
@@ -208,8 +209,9 @@ int parseLine (FILE* file, int mode, int line) {
       tmp = fscanf (file, " %i ", &lit);
       if (tmp == 0 || tmp == EOF) return 0;
       int clit = convertLit (lit);
-      if (intro[clit] == 0)
-        intro[clit] = line;
+      if (intro[clit] == 0) {
+//        printf ("c setting intro[%i] = %i\n", lit, line - 1);
+        intro[clit] = line - 1; }
       addLit (lit);
       if (lit == 0) return litCount; } }
 
