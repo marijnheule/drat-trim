@@ -24,7 +24,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <assert.h>
 #include <sys/time.h>
 
-#define PARTIALPROOF
+//#define PARTIALPROOF
 
 #define TIMEOUT     40000
 #define BIGINIT     1000000
