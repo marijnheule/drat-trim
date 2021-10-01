@@ -392,9 +392,9 @@ void printProof (struct solver *S) {
       else {
         fprintf(S->lratFile, "0\n"); } }
 
-//#ifndef PARTIALPROOF
+#ifndef PARTIALPROOF
     printLRATline (S, S->count);
-//#endif
+#endif
 
     fclose (S->lratFile);
     if (S->nWrites)
