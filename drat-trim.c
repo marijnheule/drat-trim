@@ -63,7 +63,7 @@ struct solver { FILE *inputFile, *proofFile, *lratFile, *traceFile, *activeFile;
       delProof, *setMap, *setTruth;
     char *coreStr, *lemmaStr;
     struct timeval start_time;
-    long mem_used, time, nClauses, nStep, nOpt, nAlloc, *unitStack, *reason, lemmas, nResolve,
+    long mem_used, time, nClauses, nStep, nOpt, nAlloc, *unitStack, *reason, lemmas, firstLemma, nResolve,
          nReads, nWrites, lratSize, lratAlloc, *lratLookup, **wlist, *optproof, *formula, *proof;  };
 
 static inline void assign (struct solver* S, int lit) {
@@ -150,9 +150,9 @@ static inline void markClause (struct solver* S, int* clause, int index) {
   if ((clause[index + ID] & ACTIVE) == 0) {
     S->nActive++;
     clause[index + ID] |= ACTIVE;
-//#ifdef PARTIALPROOF
-//    if ((clause + index) > (S->DB + S->firstLemma))  // don't delete original clauses
-//#endif
+#ifdef PARTIALPROOF
+    if ((clause + index) > (S->DB + S->firstLemma))  // don't delete original clauses
+#endif
     if ((S->mode == BACKWARD_UNSAT) && clause[index + 1]) {
       S->optproof[S->nOpt++] = (((long) (clause - S->DB) + index) << INFOBITS) + 1; }
     if (clause[1 + index] == 0) return;
@@ -289,6 +289,7 @@ void write_lit (struct solver *S, FILE *output, int lit) { // change to long?
     l = l >> 7; }
   while (l); }
 
+// print clause addition line
 void printLRATline (struct solver *S, int time) {
   int *line = S->lratTable + S->lratLookup[time];
   if (S->binOutput) {
@@ -391,7 +392,9 @@ void printProof (struct solver *S) {
       else {
         fprintf(S->lratFile, "0\n"); } }
 
+//#ifndef PARTIALPROOF
     printLRATline (S, S->count);
+//#endif
 
     fclose (S->lratFile);
     if (S->nWrites)
@@ -441,7 +444,9 @@ void printActive (struct solver *S) {
             fprintf (S->activeFile, "0\n"); } } } }
 
 void postprocess (struct solver *S) {
+#ifndef PARTIALPROOF
   printNoCore (S);   // print before proof optimization
+#endif
   printActive (S);
   printCore   (S);
   printTrace  (S);   // closes traceFile
@@ -1197,6 +1202,9 @@ int parse (struct solver* S) {
       clause[ID] = 2 * S->count; S->count++;
       finalClause = S->mem_used + EXTRA - 1;
       if (S->mode == FORWARD_SAT) if (nZeros > 0) clause[ID] |= ACTIVE;
+#ifdef PARTIALPROOF
+      if (nZeros > 0) clause[ID] |= ACTIVE;
+#endif
 
       for (i = 0; i < size; ++i) { clause[ i ] = buffer[ i ]; } clause[ i ] = 0;
       S->mem_used += size + EXTRA;
@@ -1219,7 +1227,8 @@ int parse (struct solver* S) {
 
       if (nZeros <= 0) S->nLemmas++;
 
-      if (!nZeros) S->lemmas   = (long) (clause - S->DB); // S->lemmas is no longer pointer
+      if (!nZeros) S->lemmas     = (long) (clause - S->DB); // S->lemmas is no longer pointer
+      if (!nZeros) S->firstLemma = (long) (clause - S->DB);
       size = 0; del = 0; --nZeros; }                      // Reset buffer
    else {
      buffer[size++] = lit;                                // Add literal to buffer
