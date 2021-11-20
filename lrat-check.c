@@ -153,6 +153,7 @@ void addClause (int index, int* literals, int size, FILE* drat) {
     while (i < clsAlloc) clsList[i++] = DELETED; }
 
   if (tableSize + size >= tableAlloc) {
+//    printf ("c increasing tableSize %i\n", tableAlloc);
     tableAlloc = (tableAlloc * 3) >> 1;
     table = (int*) realloc (table, sizeof (int) * tableAlloc); }
 
@@ -357,6 +358,8 @@ int main (int argc, char** argv) {
       return_code = 1;
     }
   }
+
+  printf ("c allocated %i %i %i\n", clsAlloc, tableAlloc, litAlloc);
 
   gettimeofday(&finish_time, NULL);
   double secs = (finish_time.tv_sec + 1e-6 * finish_time.tv_usec) -
