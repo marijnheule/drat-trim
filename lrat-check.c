@@ -35,12 +35,16 @@ void usage(char *name) {
   exit(0);
 }
 
-long long added_clauses = 0;
-long long deleted_clauses = 0;
-long long live_clauses = 0;
-long long max_live_clauses = 0;
+//typedef long long ltype;
+typedef int ltype;
+typedef int mtype;
 
-long long *mask, *intro, now, lastIndex;
+ltype added_clauses = 0;
+ltype deleted_clauses = 0;
+ltype live_clauses = 0;
+ltype max_live_clauses = 0;
+
+ltype *mask, *intro, now, lastIndex;
 
 int *clsList, clsAlloc, clsLast;
 int *table, tableSize, tableAlloc, maskAlloc;
@@ -57,7 +61,7 @@ int convertLit (int lit)   { return (abs(lit) * 2) + (lit < 0); }
 void printClause (int* clause) {
   while (*clause) printf ("%i ", *clause++); printf ("0\n"); }
 
-int checkRedundancy (int pivot, int start, int *hints, long long thisMask) {
+int checkRedundancy (int pivot, int start, int *hints, ltype thisMask) {
   int res = abs(*hints++);
   assert (start <= res);
 
@@ -87,7 +91,7 @@ int checkRedundancy (int pivot, int start, int *hints, long long thisMask) {
       if (unit != 0) return FAILED;
       unit = clit; }
     if (unit == 0) return SUCCESS;
-    if (mask[unit^1] == thisMask) printf ("c WARNING hint already satisfied in lemma with index %lli\n", lastIndex);
+    if (mask[unit^1] == thisMask) printf ("c WARNING hint already satisfied in lemma with index %lli\n", (long long) lastIndex);
     mask[unit^1] = thisMask; }
 
   if (res == 0) return SUCCESS;
@@ -102,8 +106,8 @@ int checkClause (int* list, int size, int* hints) {
     if (clit >= maskAlloc) { // in case we encountered a new literal
       int old = maskAlloc;  // need to set intro?
       maskAlloc = (clit * 3) >> 1;
-      mask  = (long long *) realloc (mask,  sizeof (long long) * maskAlloc);
-      intro = (long long *) realloc (intro, sizeof (long long) * maskAlloc);
+      mask  = (ltype *) realloc (mask,  sizeof (ltype) * maskAlloc);
+      intro = (ltype *) realloc (intro, sizeof (ltype) * maskAlloc);
       if (!mask || !intro) { printf ("c Memory allocation failure\n"); exit (1); }
       for (j = old; j < maskAlloc; j++) mask[j] = intro[j] = 0; }
     mask [clit] = now + RATs; } // mark all literals in lemma with mask
@@ -295,8 +299,8 @@ int main (int argc, char** argv) {
   litList = (int*) malloc (sizeof (int) * litAlloc);
 
   maskAlloc = 20 * nVar;
-  mask  = (long long*) malloc (sizeof(long long) * maskAlloc);
-  intro = (long long*) malloc (sizeof(long long) * maskAlloc);
+  mask  = (ltype*) malloc (sizeof(ltype) * maskAlloc);
+  intro = (ltype*) malloc (sizeof(ltype) * maskAlloc);
   for (i = 0; i < maskAlloc; i++) mask[i] = intro[i] = 0;
 
   int index = 1;
@@ -321,7 +325,7 @@ int main (int argc, char** argv) {
       exit(1); } }
 
   int mode = LRAT;
-  long long del = 0;
+  ltype del = 0;
   while (1) {
     if (live_clauses < 5 * (deleted_clauses - del)) {
       compress ();
@@ -358,7 +362,7 @@ int main (int argc, char** argv) {
   double secs = (finish_time.tv_sec + 1e-6 * finish_time.tv_usec) -
       (start_time.tv_sec + 1e-6 * start_time.tv_usec);
   printf("c Added clauses = %lld.  Deleted clauses = %lld.  Max live clauses = %lld\n",
-	 added_clauses, deleted_clauses, max_live_clauses);
+	 (long long) added_clauses, (long long) deleted_clauses, (long long) max_live_clauses);
   printf("c verification time = %.2f secs\n", secs);
   return return_code;
 }
