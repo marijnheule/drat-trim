@@ -359,7 +359,7 @@ int main (int argc, char** argv) {
     }
   }
 
-  printf ("c allocated %i %i %i\n", clsAlloc, tableAlloc, litAlloc);
+//  printf ("c allocated %i %i %i\n", clsAlloc, tableAlloc, litAlloc);
 
   gettimeofday(&finish_time, NULL);
   double secs = (finish_time.tv_sec + 1e-6 * finish_time.tv_usec) -
