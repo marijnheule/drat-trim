@@ -72,7 +72,7 @@ int checkRedundancy (int pivot, int start, int *hints, ltype thisMask) {
         while (*clause) {
           int clit = convertLit (*clause++);
           if (clit == (pivot^1)) return FAILED; } } }
-    if (clsList[res] == DELETED) { printf ("c ERROR: using DELETED clause\n"); exit (2); };
+    if (clsList[res] == DELETED) { printf ("c ERROR: using DELETED clause %i\n", res); exit (2); };
     int flag = 0, *clause = table + clsList[res];
     while (*clause) {
       int clit = convertLit (*clause++);
@@ -83,7 +83,7 @@ int checkRedundancy (int pivot, int start, int *hints, ltype thisMask) {
     if (flag == 0) return FAILED; }
 
   while (*hints > 0) {
-    if (clsList[*hints] == DELETED) { printf ("c ERROR: using DELETED clause\n"); exit (2); };
+    if (clsList[*hints] == DELETED) { printf ("c ERROR: using DELETED clause %i\n", *hints); exit (2); };
     int unit = 0, *clause = table + clsList[*(hints++)];
     while (*clause) {
       int clit = convertLit (*(clause++));
@@ -359,7 +359,7 @@ int main (int argc, char** argv) {
     }
   }
 
-  printf ("c allocated %i %i %i\n", clsAlloc, tableAlloc, litAlloc);
+//  printf ("c allocated %i %i %i\n", clsAlloc, tableAlloc, litAlloc);
 
   gettimeofday(&finish_time, NULL);
   double secs = (finish_time.tv_sec + 1e-6 * finish_time.tv_usec) -
