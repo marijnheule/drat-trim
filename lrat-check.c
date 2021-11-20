@@ -153,7 +153,7 @@ void addClause (int index, int* literals, int size, FILE* drat) {
     table = (int*) realloc (table, sizeof (int) * tableAlloc); }
 
   clsList[index] = tableSize;
-  int i; for (i = 0; i < size; i++) {
+  for (int i = 0; i < size; i++) {
     int clit = convertLit (literals[i]);
     if (intro[clit] == 0) intro[clit] = index;
     if (drat != NULL) fprintf (drat, "%i ", literals[i]);
@@ -182,6 +182,20 @@ void deleteClauses (int* list, FILE* drat) {
       deleted_clauses++;
       live_clauses--; }
   }
+}
+
+void compress () {
+   int* newTable = table;
+   int j = 0;
+   for (int i = 0; i < clsAlloc; i++) {
+     if (clsList[i] == DELETED) continue;
+     int* clause = table + clsList[i];
+     clsList[i] = j;
+     while (*clause != 0) { newTable[j++] = *clause++; }
+     newTable[j++] = 0;
+   }
+//   printf ("c compress: tableSize reduced from %i to %i\n", tableSize, j);
+   tableSize = j;
 }
 
 static void addLit (int lit) {
@@ -307,7 +321,12 @@ int main (int argc, char** argv) {
       exit(1); } }
 
   int mode = LRAT;
+  long long del = 0;
   while (1) {
+    if (live_clauses < 5 * (deleted_clauses - del)) {
+      compress ();
+      del = deleted_clauses; }
+
     int size = parseLine (proof, mode, index);
     if (size == 0) break;
 
