@@ -29,6 +29,8 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define CNF		100
 #define LRAT		200
 #define CLRAT		300
+#define BUCKET		1024
+#define INIT		1024
 
 void usage(char *name) {
   printf("Usage: %s FILE1.cnf FILE2.lrat [optional: FILE3.drat]\n", name);
@@ -49,6 +51,7 @@ ltype *mask, *intro, now, lastIndex;
 int *clsList, clsAlloc, clsLast;
 int *table, tableSize, tableAlloc, maskAlloc;
 int *litList, litCount, litAlloc;
+int *topCount, *topTable, topAlloc;
 
 int  getType   (int* list) { return list[1]; }
 int  getIndex  (int* list) { return list[0]; }
@@ -57,6 +60,16 @@ int* getHints  (int* list) { return list + getLength (list) + 2; }
 int  getRATs   (int* list) { int c = 0; while (*list) if ((*list++) < 0) c++; return c; }
 
 int convertLit (int lit)   { return (abs(lit) * 2) + (lit < 0); }
+
+inline int getClause (int index) {
+  int bucket = index / BUCKET;
+  int offset = index % BUCKET;
+  return clsList[topTable[bucket] + offset]; }
+
+inline void setClause (int index, int value) {
+  int bucket = index / BUCKET;
+  int offset = index % BUCKET;
+  clsList[topTable[bucket] + offset] = value; }
 
 void printClause (int* clause) {
   while (*clause) printf ("%i ", *clause++); printf ("0\n"); }
@@ -67,13 +80,13 @@ int checkRedundancy (int pivot, int start, int *hints, ltype thisMask) {
 
   if (res != 0) {
     while (start < res) {
-      if (clsList[start++] != DELETED) {
-        int *clause = table + clsList[start-1];
+      if (getClause(start++) != DELETED) {
+        int *clause = table + getClause(start-1);
         while (*clause) {
           int clit = convertLit (*clause++);
           if (clit == (pivot^1)) return FAILED; } } }
-    if (clsList[res] == DELETED) { printf ("c ERROR: using DELETED clause %i\n", res); exit (2); };
-    int flag = 0, *clause = table + clsList[res];
+    if (getClause(res) == DELETED) { printf ("c ERROR: using DELETED clause %i\n", res); exit (2); };
+    int flag = 0, *clause = table + getClause(res);
     while (*clause) {
       int clit = convertLit (*clause++);
       if (clit == (pivot^1)) { flag = 1; continue; }
@@ -83,8 +96,8 @@ int checkRedundancy (int pivot, int start, int *hints, ltype thisMask) {
     if (flag == 0) return FAILED; }
 
   while (*hints > 0) {
-    if (clsList[*hints] == DELETED) { printf ("c ERROR: using DELETED clause %i\n", *hints); exit (2); };
-    int unit = 0, *clause = table + clsList[*(hints++)];
+    if (getClause(*hints) == DELETED) { printf ("c ERROR: using DELETED clause %i\n", *hints); exit (2); };
+    int unit = 0, *clause = table + getClause(*(hints++));
     while (*clause) {
       int clit = convertLit (*(clause++));
       if (mask[clit] >= thisMask) continue; // lit is falsified
@@ -119,8 +132,8 @@ int checkClause (int* list, int size, int* hints) {
   int *first = hints; first++; while (*first > 0) first++;
   int start = intro[pivot ^ 1];
   while (start < -first[0]) {  // check whether no clause before -first[0] has -pivot.
-    if (clsList[start] != DELETED) {
-      int *clause = table + clsList[start];
+    if (getClause(start) != DELETED) {
+      int *clause = table + getClause(start);
       while (*clause) {
         int clit = convertLit (*clause++);
         if (clit == (pivot^1)) return FAILED; } }
@@ -137,8 +150,8 @@ int checkClause (int* list, int size, int* hints) {
     start = abs(*hints) + 1; }
 
   while (start <= clsLast) {
-    if (clsList[start++] != DELETED) {
-      int *clause = table + clsList[start-1];
+    if (getClause(start++) != DELETED) {
+      int *clause = table + getClause(start-1);
       while (*clause) {
         int clit = convertLit (*clause++);
         if (clit == (pivot^1)) return FAILED; } } }
@@ -146,18 +159,31 @@ int checkClause (int* list, int size, int* hints) {
   return SUCCESS; }
 
 void addClause (int index, int* literals, int size, FILE* drat) {
-  if (index >= clsAlloc) {
-    int i = clsAlloc;
-    clsAlloc = (index * 3) >> 1;
+  if (index >= topAlloc * BUCKET) {
+    int i = topAlloc;
+
+    topAlloc = (index / BUCKET * 3) >> 1;
+    topTable = (int*) realloc (topTable, sizeof(int) * topAlloc);
+    for (int j = i; j < topAlloc; j++) topTable[j] = j * BUCKET;
+    topCount = (int*) realloc (topCount, sizeof(int) * topAlloc);
+    for (int j = i; j < topAlloc; j++) topCount[j] = 0;
+
+    clsAlloc = topAlloc * BUCKET;
     clsList = (int*) realloc (clsList, sizeof(int) * clsAlloc);
-    while (i < clsAlloc) clsList[i++] = DELETED; }
+    i = index;
+    while (i < clsAlloc) setClause(i++, DELETED); }
+
+//  if (index >= clsAlloc) {
+//    int i = clsAlloc;
+//    clsAlloc = (index * 3) >> 1;
+//    clsList = (int*) realloc (clsList, sizeof(int) * clsAlloc);
+//    while (i < clsAlloc) setClause (i++, DELETED); }
 
   if (tableSize + size >= tableAlloc) {
-//    printf ("c increasing tableSize %i\n", tableAlloc);
     tableAlloc = (tableAlloc * 3) >> 1;
     table = (int*) realloc (table, sizeof (int) * tableAlloc); }
 
-  clsList[index] = tableSize;
+  setClause (index, tableSize);
   for (int i = 0; i < size; i++) {
     int clit = convertLit (literals[i]);
     if (intro[clit] == 0) intro[clit] = index;
@@ -166,6 +192,9 @@ void addClause (int index, int* literals, int size, FILE* drat) {
   if (drat != NULL) fprintf (drat, "0\n");
   table[tableSize++] = 0;
   clsLast = index;
+  int bucket = topTable[index/BUCKET];
+  topCount[bucket]++;
+
   added_clauses++;
   live_clauses++;
   if (live_clauses > max_live_clauses)
@@ -175,15 +204,18 @@ void addClause (int index, int* literals, int size, FILE* drat) {
 void deleteClauses (int* list, FILE* drat) {
   while (*list) {
     int index = *list++;
-    if (clsList[index] == DELETED) {
+    if (getClause(index) == DELETED) {
       printf ("c WARNING: clause %i is already deleted\n", index); }
     else {
       if (drat) {
-        int* clause = table + clsList[index];
+        int* clause = table + getClause(index);
         fprintf (drat, "d ");
         while (*clause) fprintf (drat, "%i ", *clause++);
         fprintf (drat, "0\n"); }
-      clsList[index] = DELETED;
+      setClause (index, DELETED);
+      int bucket = topTable[index/BUCKET];
+      topCount[bucket]--;
+      if (topCount[bucket] == 0) printf ("c bucket %i is empty\n", bucket);
       deleted_clauses++;
       live_clauses--; }
   }
@@ -193,9 +225,9 @@ void compress () {
    int* newTable = table;
    int j = 0;
    for (int i = 0; i < clsAlloc; i++) {
-     if (clsList[i] == DELETED) continue;
-     int* clause = table + clsList[i];
-     clsList[i] = j;
+     if (getClause(i) == DELETED) continue;
+     int* clause = table + getClause(i);
+     setClause (i, j);
      while (*clause != 0) { newTable[j++] = *clause++; }
      newTable[j++] = 0;
    }
@@ -273,7 +305,7 @@ int main (int argc, char** argv) {
   gettimeofday(&start_time, NULL);
   now = 0, clsLast = 0;
 
-  int i, nVar = 0, nCls = 0;
+  int nVar = 0, nCls = 0;
   char ignore[1024];
   FILE* cnf   = fopen (argv[1], "r");
   if (!cnf) {
@@ -288,9 +320,15 @@ int main (int argc, char** argv) {
     if (j == 1024) {
       printf ("c ERROR: comment longer than 1024 characters: %s\n", ignore); exit (0); } }
 
-  clsAlloc = nCls * 2;
+  topAlloc = INIT;
+  topTable = (int*) malloc (sizeof(int) * topAlloc);
+  for (int i = 0; i < topAlloc; i++) topTable[i] = i * BUCKET;
+  topCount = (int*) malloc (sizeof(int) * topAlloc);
+  for (int i = 0; i < topAlloc; i++) topCount[i] = 0;
+
+  clsAlloc = INIT * BUCKET;
   clsList  = (int*) malloc (sizeof(int) * clsAlloc);
-  for (i = 0; i < clsAlloc; i++) clsList[i] = DELETED;
+  for (int i = 0; i < clsAlloc; i++) clsList[i] = DELETED;
 
   tableSize  = 0;
   tableAlloc = nCls * 2;
@@ -302,7 +340,7 @@ int main (int argc, char** argv) {
   maskAlloc = 20 * nVar;
   mask  = (ltype*) malloc (sizeof(ltype) * maskAlloc);
   intro = (ltype*) malloc (sizeof(ltype) * maskAlloc);
-  for (i = 0; i < maskAlloc; i++) mask[i] = intro[i] = 0;
+  for (int i = 0; i < maskAlloc; i++) mask[i] = intro[i] = 0;
 
   int index = 1;
   while (1) {
@@ -328,7 +366,7 @@ int main (int argc, char** argv) {
   int mode = LRAT;
   ltype del = 0;
   while (1) {
-    if (live_clauses < 5 * (deleted_clauses - del)) {
+    if (live_clauses < 2 * (deleted_clauses - del)) {
       compress ();
       del = deleted_clauses; }
 
@@ -359,7 +397,7 @@ int main (int argc, char** argv) {
     }
   }
 
-//  printf ("c allocated %i %i %i\n", clsAlloc, tableAlloc, litAlloc);
+  printf ("c allocated %i %i %i\n", clsAlloc, tableAlloc, litAlloc);
 
   gettimeofday(&finish_time, NULL);
   double secs = (finish_time.tv_sec + 1e-6 * finish_time.tv_usec) -
