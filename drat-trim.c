@@ -866,7 +866,7 @@ int verify (struct solver *S, int begin, int end) {
           if (!(ad & 1))                          clause[ID] |= ACTIVE; } } }
     if (!S->backforce) {
       printf ("\rc ERROR: no conflict\n");
-//      return SAT;
+      return SAT;
     } }
 
   start_verification:;

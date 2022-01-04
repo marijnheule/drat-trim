@@ -189,7 +189,7 @@ void deleteClauses (int* list, FILE* drat) {
   }
 }
 
-void compress () {
+void compress (int index) {
    int* newTable = table;
    int j = 0;
    for (int i = 0; i < clsAlloc; i++) {
@@ -199,7 +199,7 @@ void compress () {
      while (*clause != 0) { newTable[j++] = *clause++; }
      newTable[j++] = 0;
    }
-//   printf ("c compress: tableSize reduced from %i to %i\n", tableSize, j);
+   printf ("c compress at index %i: tableSize reduced from %i to %i\n", index, tableSize, j);
    tableSize = j;
 }
 
@@ -326,25 +326,26 @@ int main (int argc, char** argv) {
       exit(1); } }
 
   int mode = LRAT;
+  int line = 0;
   ltype del = 0;
   while (1) {
     if (live_clauses < 5 * (deleted_clauses - del)) {
-      compress ();
+      compress (line);
       del = deleted_clauses; }
 
-    int size = parseLine (proof, mode, index);
+    int size = parseLine (proof, LRAT, 0);
     if (size == 0) break;
 
     if (getType (litList) == (int) 'd') {
       deleteClauses (litList + 2, drat); }
     else if (getType (litList) == (int) 'a') {
-      int  index  = getIndex  (litList);
-      lastIndex = index;
+      line  = getIndex  (litList);
+      lastIndex = line;
       int  length = getLength (litList);
       int* hints  = getHints  (litList);
 
       if (checkClause (litList + 2, length, hints) == SUCCESS) {
-        addClause (index, litList + 2, length, drat); }
+        addClause (line, litList + 2, length, drat); }
       else {
         printf("c failed to check clause: "); printClause (litList + 2);
         printf("c NOT VERIFIED\n");
