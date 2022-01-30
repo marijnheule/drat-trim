@@ -114,7 +114,7 @@ int checkClause (int* list, int size, int* hints) {
 
   int res = checkRedundancy (pivot, 0, hints, now + RATs);
   if (res  == FAILED) return FAILED;
-  if (RATs == 0)      return SUCCESS;
+  if (RATs == 0 && intro[pivot ^ 1] == 0) return SUCCESS;
 
   int *first = hints; first++; while (*first > 0) first++;
   int start = intro[pivot ^ 1];
