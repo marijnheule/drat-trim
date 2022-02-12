@@ -58,12 +58,12 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 struct solver { FILE *inputFile, *proofFile, *lratFile, *traceFile, *activeFile;
     int *DB, nVars, timeout, mask, delete, *falseStack, *falseA, *forced, binMode, optimize, binOutput,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, nActive, *lratTable,
-      nLemmas, maxRAT, *RATset, *preRAT, maxDependencies, nDependencies, bar, backforce, reduce,
+      nLemmas, maxRAT, *preRAT, maxDependencies, nDependencies, bar, backforce, reduce,
       *dependencies, maxVar, maxSize, mode, verb, unitSize, unitStackSize, prep, *current, nRemoved, warning,
       delProof, *setMap, *setTruth;
     char *coreStr, *lemmaStr;
     struct timeval start_time;
-    long mem_used, time, nClauses, nStep, nOpt, nAlloc, *unitStack, *reason, lemmas, nResolve,
+    long mem_used, time, nClauses, nStep, nOpt, nAlloc, *unitStack, *reason, lemmas, nResolve, *RATset,
          nReads, nWrites, lratSize, lratAlloc, *lratLookup, **wlist, *optproof, *formula, *proof;  };
 
 static inline void assign (struct solver* S, int lit) {
@@ -564,7 +564,7 @@ int checkRAT (struct solver *S, int pivot, int mark) {
               continue; }
 	    if (nRAT == S->maxRAT) {
 	      S->maxRAT = (S->maxRAT * 3) >> 1;
-	      S->RATset = realloc (S->RATset, sizeof (int) * S->maxRAT);
+	      S->RATset = realloc (S->RATset, sizeof (long) * S->maxRAT);
               assert (S->RATset != NULL); }
 	    S->RATset[nRAT++] = S->wlist[i][j] >> 1;
             break; } } } }
@@ -572,10 +572,10 @@ int checkRAT (struct solver *S, int pivot, int mark) {
   // S->prep = 1;
   // Check all clauses in RATset for RUP
   int flag = 1;
-  qsort (S->RATset, nRAT, sizeof (int), compare);
+  qsort (S->RATset, nRAT, sizeof (long), compare);
   S->nDependencies = 0;
   for (i = nRAT - 1; i >= 0; i--) {
-    int* RATcls = S->DB + S->RATset[i];
+    int* RATcls = (int*) (S->DB + S->RATset[i]);
     int id = RATcls[ID] >> 1;
     int blocked = 0;
     long int reason  = 0;
@@ -593,7 +593,7 @@ int checkRAT (struct solver *S, int pivot, int mark) {
       S->reason[abs (blocked)] = 0; }
 
     if (!blocked) {
-      RATcls = S->DB + S->RATset[i];
+      RATcls = (int*) (S->DB + S->RATset[i]);
       while (*RATcls) {
         int lit = *RATcls++;
         if (lit != -pivot && !S->falseA[lit]) {
@@ -1269,7 +1269,7 @@ int parse (struct solver* S) {
   S->optproof   = (long *) malloc (sizeof(long) * (2 * S->nLemmas + S->nClauses));
 
   S->maxRAT = INIT;
-  S->RATset = (int*) malloc (sizeof (int) * S->maxRAT);
+  S->RATset = (long*) malloc (sizeof (long) * S->maxRAT);
   for (i = 0; i < S->maxRAT; i++) S->RATset[i] = 0; // is this required?
 
   S->preRAT = (int*) malloc (sizeof (int) * n);
