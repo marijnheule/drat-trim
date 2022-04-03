@@ -24,8 +24,10 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <limits.h>
 #include <sys/time.h>
 
+#define PRINT		0
 #define DELETED		-1
 //#define DELETED		INT_MAX
+#define CONFLICT	2
 #define SUCCESS		1
 #define FAILED		0
 #define CNF		100
@@ -64,6 +66,7 @@ int* getHints  (int* list) { return list + getLength (list) + 2; }
 int  getRATs   (int* list) { int c = 0; while (*list) if ((*list++) < 0) c++; return c; }
 
 int convertLit (int lit)   { return (abs(lit) * 2) + (lit < 0); }
+int printLit   (int lit)   { return (lit >> 1) * (-2 * (lit&1) + 1); }
 
 inline int getClause (int index) {
   int bucket = index / BUCKET;
@@ -78,10 +81,11 @@ inline void setClause (int index, int value) {
 void printClause (int* clause) {
   while (*clause) printf ("%i ", *clause++); printf ("0\n"); }
 
-int checkRedundancy (int pivot, int start, int *hints, ltype thisMask) {
+int checkRedundancy (int pivot, int start, int *hints, ltype thisMask, int print) {
   int res = abs(*hints++);
   assert (start <= res);
 
+  if (print) printf ("c check redundancy res: %i pivot: %i start: %i\n", res, printLit(pivot), start);
   if (res != 0) {
     while (start < res) {
       if (getClause(start++) != DELETED) {
@@ -100,8 +104,9 @@ int checkRedundancy (int pivot, int start, int *hints, ltype thisMask) {
     if (flag == 0) { printf ("c FAILED: pivot %i not found\n", pivot); return FAILED; } }
 
   while (*hints > 0) {
-//    printf ("c hint %i\n", *hints);
-//    int* c = table + getClause(*hints); printClause (c);
+    if (print) {
+      printf ("c hint %i\nc ", *hints);
+      int* c = table + getClause(*hints); printClause (c); }
     if (getClause(*hints) == DELETED) { printf ("c ERROR: using DELETED hint clause %i\n", *hints); printf ("c %i\n", topTable[*hints/BUCKET]); return FAILED; };
     int unit = 0, *clause = table + getClause(*(hints++));
     while (*clause) {
@@ -110,18 +115,21 @@ int checkRedundancy (int pivot, int start, int *hints, ltype thisMask) {
       if (unit != 0) { printf ("c FAILED: multiple literals unassigned in hint %i: %i %i\n", hints[-1], unit%2?(-unit >> 1):(unit>>1), clit%2?(-clit >> 1):(clit>>1));
                        return FAILED; }
       unit = clit; }
-    if (unit == 0) return SUCCESS;
+    if (print) {
+      if (unit != 0) printf ("c unit %i\n", printLit(unit));
+      else           printf ("c detected conflict\n"); }
+    if (unit == 0) return CONFLICT;  // detected conflict
     if (mask[unit^1] == thisMask) printf ("c WARNING hint already satisfied in lemma with index %lli\n", (long long) lastIndex);
     mask[unit^1] = thisMask; }
 
   if (res == 0) return SUCCESS;
   return FAILED; }
 
-int checkClause (int* list, int size, int* hints) {
+int checkClause (int* list, int size, int* hints, int print) {
   now++;
   int i, j, pivot = convertLit (list[0]);
-  int RATs = getRATs (hints + 1);
-  for (i = 0; i < size; i++) {
+  int RATs = getRATs (hints + 1); // the number of negated hints
+  for (i = 0; i < size; i++) { // assign all literals in the clause to false
     int clit = convertLit (list[i]);
     if (clit >= maskAlloc) { // in case we encountered a new literal
       int old = maskAlloc;  // need to set intro?
@@ -132,12 +140,18 @@ int checkClause (int* list, int size, int* hints) {
       for (j = old; j < maskAlloc; j++) mask[j] = intro[j] = 0; }
     mask [clit] = now + RATs; } // mark all literals in lemma with mask
 
-  int res = checkRedundancy (pivot, 0, hints, now + RATs);
-  if (res  == FAILED) { return FAILED; }
-  if (RATs == 0)      return SUCCESS;
+  int res = checkRedundancy (pivot, 0, hints, now + RATs, print);
+  if (res == CONFLICT) { return SUCCESS; }
+  if (res == FAILED  ) { return FAILED;  }
 
   int *first = hints; first++; while (*first > 0) first++;
   int start = intro[pivot ^ 1];
+
+  if (RATs == 0)      {
+    if (print) printf ("c start %i first %i\n", start, -first[0]);
+    if (start != 0) return FAILED;
+    return SUCCESS; }
+
   while (start < -first[0]) {  // check whether no clause before -first[0] has -pivot.
     if (getClause(start) != DELETED) {
       int *clause = table + getClause(start);
@@ -147,13 +161,14 @@ int checkClause (int* list, int size, int* hints) {
     start++; }
   intro[pivot ^ 1] = -first[0];
 
+
   if (start == 0) return SUCCESS;
   while (1) {
     hints++; now++; while (*hints > 0) hints++;
     if (*hints == 0) break;
     if (-hints[0] < start) printf ("c %i %i\n", -hints[0], start);
     assert (-hints[0] >= start);
-    if (checkRedundancy (pivot, start, hints, now) == FAILED) return FAILED;
+    if (checkRedundancy (pivot, start, hints, now, print) == FAILED) return FAILED;
     start = abs(*hints) + 1; }
 
   while (start <= clsLast) {
@@ -242,12 +257,13 @@ void deleteClauses (int* list, FILE* drat) {
   }
 }
 
-void compress (int index) {
+void compress (int index, int print) {
    int* newTable = table;
    int n = 0;
    for (int i = 0; i < topAlloc; i++) {
      if (topTable[i] == -1) continue;
 //     int b = topTable[i];
+//     printf ("c bucket: %i size: %i\n", b, inBucket[b]);
 //     assert (inBucket[b]);
      for (int j = 0; j < BUCKET; j++) {
        int c = i*BUCKET+j;
@@ -270,7 +286,8 @@ void compress (int index) {
        newTable[n++] = 0; }
    }
 */
-   printf ("c compress at index %i: tableSize reduced from %i to %i\n", index, tableSize, n);
+   if (print)
+     printf ("c compress at index %i: tableSize reduced from %i to %i\n", index, tableSize, n);
    tableSize = n;
 }
 
@@ -402,12 +419,13 @@ int main (int argc, char** argv) {
       printf("c Couldn't open file '%s'\n", argv[3]);
       exit(1); } }
 
+  int print = PRINT;
   int mode = LRAT;
   int line = 0;
   ltype del = 0;
   while (1) {
     if (live_clauses < 5 * (deleted_clauses - del)) {
-      compress (line);
+      compress (line, print);
       del = deleted_clauses; }
 
     int size = parseLine (proof, LRAT, 0);
@@ -421,10 +439,11 @@ int main (int argc, char** argv) {
       int  length = getLength (litList);
       int* hints  = getHints  (litList);
 
-      if (checkClause (litList + 2, length, hints) == SUCCESS) {
+      if (checkClause (litList + 2, length, hints, print) == SUCCESS) {
         addClause (line, litList + 2, length, drat); }
       else {
         printf("c failed while checking clause: "); printClause (litList + 2);
+        checkClause (litList + 2, length, hints, 1);
         printf("c NOT VERIFIED\n");
         return_code = 1;
         break;
