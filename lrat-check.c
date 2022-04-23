@@ -26,14 +26,13 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #define PRINT		0
 #define DELETED		-1
-//#define DELETED		INT_MAX
 #define CONFLICT	2
 #define SUCCESS		1
 #define FAILED		0
 #define CNF		100
 #define LRAT		200
 #define CLRAT		300
-#define BUCKET		8196
+#define BUCKET		8192
 #define INIT		1024
 
 void usage(char *name) {
@@ -85,6 +84,7 @@ int checkRedundancy (int pivot, int start, int *hints, ltype thisMask, int print
   int res = abs(*hints++);
   assert (start <= res);
 
+
   if (print) printf ("c check redundancy res: %i pivot: %i start: %i\n", res, printLit(pivot), start);
   if (res != 0) {
     while (start < res) {
@@ -127,17 +127,21 @@ int checkRedundancy (int pivot, int start, int *hints, ltype thisMask, int print
 
 int checkClause (int* list, int size, int* hints, int print) {
   now++;
-  int i, j, pivot = convertLit (list[0]);
+  int pivot = convertLit (list[0]);
+
+
+
   int RATs = getRATs (hints + 1); // the number of negated hints
-  for (i = 0; i < size; i++) { // assign all literals in the clause to false
+  for (int i = 0; i < size; i++) { // assign all literals in the clause to false
     int clit = convertLit (list[i]);
     if (clit >= maskAlloc) { // in case we encountered a new literal
       int old = maskAlloc;  // need to set intro?
       maskAlloc = (clit * 3) >> 1;
+      if (maskAlloc % 2) maskAlloc++;
       mask  = (ltype *) realloc (mask,  sizeof (ltype) * maskAlloc);
       intro = (ltype *) realloc (intro, sizeof (ltype) * maskAlloc);
       if (!mask || !intro) { printf ("c Memory allocation failure\n"); exit (1); }
-      for (j = old; j < maskAlloc; j++) mask[j] = intro[j] = 0; }
+      for (int j = old; j < maskAlloc; j++) mask[j] = intro[j] = 0; }
     mask [clit] = now + RATs; } // mark all literals in lemma with mask
 
   int res = checkRedundancy (pivot, 0, hints, now + RATs, print);
