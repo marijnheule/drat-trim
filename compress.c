@@ -24,16 +24,26 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define EMPTY	-1
 #define INIT	1000
 
+#ifdef LONGTYPE
+  typedef long long ltype;
+#else
+  typedef int ltype;
+#endif
+
 long long table_size, table_alloc, *lookup;
-int lookup_size, lookup_alloc, *table;
+ltype lookup_size, lookup_alloc, *table;
 
 
 int abscompare (const void *a, const void *b) {
-  return (abs(*(int*)a) - abs(*(int*)b)); }
+#ifdef LONGTYPE
+  return (llabs(*(ltype*)a) - llabs(*(ltype*)b)); }
+#else
+  return (abs(*(ltype*)a) - abs(*(ltype*)b)); }
+#endif
 
-void write_lit (FILE *output, int lit, int sort) {
+void write_lit (FILE *output, ltype lit, int sort) {
   if (sort == 0) {
-    unsigned int l = abs (lit) << 1;
+    unsigned long long l = llabs (lit) << 1;
     if (lit < 0) l++;
 
     do {
@@ -44,7 +54,7 @@ void write_lit (FILE *output, int lit, int sort) {
   else {
     if (table_size >= table_alloc) {
       table_alloc = (table_alloc * 3) >> 1;
-      table = (int*) realloc (table, sizeof(int) * table_alloc); }
+      table = (ltype*) realloc (table, sizeof(ltype) * table_alloc); }
     table[ table_size++ ] = lit; }
 }
 
@@ -67,7 +77,7 @@ int main (int argc, char** argv) {
     for (i = 0; i < lookup_alloc; i++) lookup[i] = EMPTY;
     table_size   =    0;
     table_alloc  = INIT;
-    table = (int*) malloc (sizeof (int) * table_alloc); }
+    table = (ltype*) malloc (sizeof (ltype) * table_alloc); }
 
   while (1) {
     tmp = fscanf (input ," %i ", &line);
@@ -91,10 +101,10 @@ int main (int argc, char** argv) {
 
     if (size == 2) {
       if (sort == 1) {
-        int entry = 2 * line + del;
+        ltype entry = 2 * line + del;
         if (entry >  lookup_size) lookup_size = entry;
         if (entry >= lookup_alloc) {
-          int old = lookup_alloc;
+          ltype old = lookup_alloc;
           lookup_alloc = 3 * entry >> 1;
           lookup = (long long*) realloc (lookup, sizeof (long long) * lookup_alloc);
           for (i = old; i < lookup_alloc; i++) lookup[i] = EMPTY; }
@@ -116,15 +126,15 @@ int main (int argc, char** argv) {
     if (lookup[i] == EMPTY) continue;
     if (i % 2) { fputc ('d', output); zeros = 1; }
     else       { fputc ('a', output); zeros = 2; }
-    int *list = table + lookup[i];
+    ltype *list = table + lookup[i];
 
     if (zeros == 2) {
       write_lit (output, *list++, 0); // write index;
       if (*list) write_lit (output, *list++, 0); // write pivot;
 
-      int* start = list; int count = 0;
+      ltype* start = list; int count = 0;
       while (*list) { count++; list++; }
-      qsort (start, count, sizeof (int), abscompare);
+      qsort (start, count, sizeof (ltype), abscompare);
 
       list = start;
       while (*list) write_lit (output, *list++, 0);

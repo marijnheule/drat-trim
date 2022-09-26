@@ -40,8 +40,11 @@ void usage(char *name) {
   exit(0);
 }
 
-//typedef long long ltype;
-typedef int ltype;
+#ifdef LONGTYPE
+  typedef long long ltype;
+#else
+  typedef int ltype;
+#endif
 typedef int mtype;
 
 ltype added_clauses = 0;
