@@ -448,7 +448,7 @@ int main (int argc, char** argv) {
       else {
         printf("c failed while checking clause: "); printClause (litList + 2);
         checkClause (litList + 2, length, hints, 1);
-        printf("c NOT VERIFIED\n");
+        printf("s DERIVATION\n");
         return_code = 1;
         break;
       }

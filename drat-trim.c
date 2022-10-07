@@ -1409,6 +1409,7 @@ int main (int argc, char** argv) {
       else if (argv[i][1] == 'S') S.mode       = FORWARD_SAT; }
     else {
       tmp++;
+
       if (tmp == 1) {
         S.inputFile = fopen (argv[1], "r");
         if (S.inputFile == NULL) {
