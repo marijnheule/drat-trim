@@ -364,7 +364,8 @@ int main (int argc, char** argv) {
   if (argc < 3)
      usage(argv[0]);
   struct timeval start_time, finish_time;
-  int return_code = 0;
+  int found_error = 0; // encountered an error?
+  int found_empty_clause = 0; // encountered derivation of empty clause?
   gettimeofday(&start_time, NULL);
   now = 0, clsLast = 0;
 
@@ -451,17 +452,30 @@ int main (int argc, char** argv) {
       else {
         printf("c failed while checking clause: "); printClause (litList + 2);
         checkClause (litList + 2, length, hints, 1);
-        printf("c NOT VERIFIED\n");
-        return_code = 1;
+        found_error = 1;
         break;
       }
       if (length == 0)
-        printf ("c VERIFIED\n");
+        found_empty_clause = 1;
     }
     else {
       printf ("c failed type\n");
-      return_code = 1;
+      found_error = 1;
+      break;
     }
+  }
+
+  int return_code;
+  if (found_empty_clause && !found_error) {
+    printf ("c VERIFIED\n");
+    return_code = 0;
+  } else {
+    if (!found_error) {
+      // print why the proof failed
+      printf ("c checking ended before empty clause was found\n");
+    }
+    printf ("c NOT VERIFIED\n");
+    return_code = 1;
   }
 
   printf ("c allocated %i %i %i\n", maxBucket, tableAlloc, litAlloc);
