@@ -59,7 +59,8 @@ int maxBucket;
 int *clsList, clsAlloc, clsLast;
 int *table, tableSize, tableAlloc, maskAlloc;
 int *litList, litCount, litAlloc;
-int *inBucket, *topTable, topAlloc;
+int *inBucket;
+int *topTable, topAlloc;
 
 int  getType   (int* list) { return list[1]; }
 int  getIndex  (int* list) { return list[0]; }
@@ -131,8 +132,6 @@ int checkRedundancy (int pivot, int start, int *hints, ltype thisMask, int print
 int checkClause (int* list, int size, int* hints, int print) {
   now++;
   int pivot = convertLit (list[0]);
-
-
 
   int RATs = getRATs (hints + 1); // the number of negated hints
   for (int i = 0; i < size; i++) { // assign all literals in the clause to false
@@ -333,8 +332,10 @@ int parseLine (FILE* file, int mode, int line) {
     int index;
     int zeros = 2;
     tmp = fscanf (file, " %i ", &index);
+//    printf ("%lli ", index);
+//    assert (index > 0);
     if (tmp == 0 || tmp == EOF) return 0;
-    addLit (index);
+    addLit ((int) index);
 
     tmp = fscanf (file, " d %i ", &lit);
     if (tmp == 1) {
