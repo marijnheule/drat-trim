@@ -1,6 +1,6 @@
 /************************************************************************************[lrat-check.c]
-Copyright (c) 2017-2021 Marijn Heule, Carnegie Mellon University
-Last edit: September 12, 2021
+Copyright (c) 2017-2022 Marijn Heule, Carnegie Mellon University
+Last edit: October 19, 2022
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -88,7 +88,6 @@ int checkRedundancy (int pivot, int start, int *hints, ltype thisMask, int print
   int res = abs(*hints++);
   assert (start <= res);
 
-
   if (print) printf ("c check redundancy res: %i pivot: %i start: %i\n", res, printLit(pivot), start);
   if (res != 0) {
     while (start < res) {
@@ -147,6 +146,7 @@ int checkClause (int* list, int size, int* hints, int print) {
     mask [clit] = now + RATs; } // mark all literals in lemma with mask
 
   int res = checkRedundancy (pivot, 0, hints, now + RATs, print);
+
   if (res == CONFLICT) { return SUCCESS; }
   if (res == FAILED  ) { return FAILED;  }
 
@@ -154,6 +154,7 @@ int checkClause (int* list, int size, int* hints, int print) {
   int start = intro[pivot ^ 1];
 
   if (RATs == 0)      {
+    if (res == SUCCESS) return FAILED; // No RAT and no conflict is FAILED
     if (print) printf ("c start %i first %i\n", start, -first[0]);
     if (start != 0) return FAILED;
     return SUCCESS; }
@@ -166,7 +167,6 @@ int checkClause (int* list, int size, int* hints, int print) {
         if (clit == (pivot^1)) return FAILED; } }
     start++; }
   intro[pivot ^ 1] = -first[0];
-
 
   if (start == 0) return SUCCESS;
   while (1) {
