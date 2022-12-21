@@ -1,6 +1,6 @@
 /************************************************************************************[lrat-check.c]
-Copyright (c) 2017-2021 Marijn Heule, Carnegie Mellon University
-Last edit: September 12, 2021
+Copyright (c) 2017-2022 Marijn Heule, Carnegie Mellon University
+Last edit: December 20, 2022
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -56,7 +56,8 @@ int maxBucket;
 int *clsList, clsAlloc, clsLast;
 int *table, tableSize, tableAlloc, maskAlloc;
 int *litList, litCount, litAlloc;
-int *inBucket, *topTable, topAlloc;
+int *inBucket, *topTable;
+ltype topAlloc;
 
 int  getType   (int* list) { return list[1]; }
 int  getIndex  (int* list) { return list[0]; }
@@ -188,9 +189,9 @@ void addClause (int index, int* literals, int size, FILE* drat) {
 
 //  printf ("c index %i\n", index);
   if (index >= topAlloc * BUCKET) {
-    int old = topAlloc;
+    ltype old = topAlloc;
     topAlloc = (topAlloc * 3) >> 1;
-    printf ("c topTable reallocation from %i to %i\n", old, topAlloc);
+    printf ("c topTable reallocation from %lli to %lli\n", old, topAlloc);
     topTable = (int*) realloc (topTable, sizeof(int) * topAlloc);
     for (int j = old; j < topAlloc; j++) topTable[j] = -1; }
 
@@ -373,8 +374,8 @@ int main (int argc, char** argv) {
       exit(1); }
 
   for (;;) {
-    fscanf (cnf, " p cnf %i %i ", &nVar, &nCls);
-    if (nVar > 0) break;
+    int tmp = fscanf (cnf, " p cnf %i %i ", &nVar, &nCls);
+    if (tmp == 2) break;
     fgets (ignore, sizeof (ignore), cnf);
     int j; for (j = 0; j < 1024; j++) { if (ignore[j] == '\n') break; }
     if (j == 1024) {
@@ -405,6 +406,10 @@ int main (int argc, char** argv) {
   int index = 1;
   while (1) {
     int size = parseLine (cnf, CNF, index);
+    if (size == 1) {
+      printf ("c formula contains empty clause\n");
+      printf ("s VERIFIED\n");
+      break; }
     if (size == 0) break;
     addClause (index++, litList, size, NULL); }
   fclose (cnf);
