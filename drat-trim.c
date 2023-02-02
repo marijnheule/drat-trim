@@ -24,7 +24,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <assert.h>
 #include <sys/time.h>
 
-#define PARTIALPROOF
+//#define PARTIALPROOF
 
 #define TIMEOUT     40000
 #define BIGINIT     1000000
@@ -58,12 +58,12 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 struct solver { FILE *inputFile, *proofFile, *lratFile, *traceFile, *activeFile;
     int *DB, nVars, timeout, mask, delete, *falseStack, *falseA, *forced, binMode, optimize, binOutput,
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, nActive, *lratTable,
-      nLemmas, maxRAT, *RATset, *preRAT, maxDependencies, nDependencies, bar, backforce, reduce,
+      nLemmas, maxRAT, *preRAT, maxDependencies, nDependencies, bar, backforce, reduce,
       *dependencies, maxVar, maxSize, mode, verb, unitSize, unitStackSize, prep, *current, nRemoved, warning,
       delProof, *setMap, *setTruth;
     char *coreStr, *lemmaStr;
     struct timeval start_time;
-    long mem_used, time, nClauses, nStep, nOpt, nAlloc, *unitStack, *reason, lemmas, firstLemma, nResolve,
+    long mem_used, time, nClauses, nStep, nOpt, nAlloc, *unitStack, *reason, lemmas, nResolve, *RATset,
          nReads, nWrites, lratSize, lratAlloc, *lratLookup, **wlist, *optproof, *formula, *proof;  };
 
 static inline void assign (struct solver* S, int lit) {
@@ -150,9 +150,9 @@ static inline void markClause (struct solver* S, int* clause, int index) {
   if ((clause[index + ID] & ACTIVE) == 0) {
     S->nActive++;
     clause[index + ID] |= ACTIVE;
-#ifdef PARTIALPROOF
-    if ((clause + index) > (S->DB + S->firstLemma))  // don't delete original clauses
-#endif
+//#ifdef PARTIALPROOF
+//    if ((clause + index) > (S->DB + S->firstLemma))  // don't delete original clauses
+//#endif
     if ((S->mode == BACKWARD_UNSAT) && clause[index + 1]) {
       S->optproof[S->nOpt++] = (((long) (clause - S->DB) + index) << INFOBITS) + 1; }
     if (clause[1 + index] == 0) return;
@@ -289,7 +289,6 @@ void write_lit (struct solver *S, FILE *output, int lit) { // change to long?
     l = l >> 7; }
   while (l); }
 
-// print clause addition line
 void printLRATline (struct solver *S, int time) {
   int *line = S->lratTable + S->lratLookup[time];
   if (S->binOutput) {
@@ -392,9 +391,7 @@ void printProof (struct solver *S) {
       else {
         fprintf(S->lratFile, "0\n"); } }
 
-#ifndef PARTIALPROOF
     printLRATline (S, S->count);
-#endif
 
     fclose (S->lratFile);
     if (S->nWrites)
@@ -444,9 +441,7 @@ void printActive (struct solver *S) {
             fprintf (S->activeFile, "0\n"); } } } }
 
 void postprocess (struct solver *S) {
-#ifndef PARTIALPROOF
   printNoCore (S);   // print before proof optimization
-#endif
   printActive (S);
   printCore   (S);
   printTrace  (S);   // closes traceFile
@@ -569,7 +564,7 @@ int checkRAT (struct solver *S, int pivot, int mark) {
               continue; }
 	    if (nRAT == S->maxRAT) {
 	      S->maxRAT = (S->maxRAT * 3) >> 1;
-	      S->RATset = realloc (S->RATset, sizeof (int) * S->maxRAT);
+	      S->RATset = realloc (S->RATset, sizeof (long) * S->maxRAT);
               assert (S->RATset != NULL); }
 	    S->RATset[nRAT++] = S->wlist[i][j] >> 1;
             break; } } } }
@@ -577,10 +572,10 @@ int checkRAT (struct solver *S, int pivot, int mark) {
   // S->prep = 1;
   // Check all clauses in RATset for RUP
   int flag = 1;
-  qsort (S->RATset, nRAT, sizeof (int), compare);
+  qsort (S->RATset, nRAT, sizeof (long), compare);
   S->nDependencies = 0;
   for (i = nRAT - 1; i >= 0; i--) {
-    int* RATcls = S->DB + S->RATset[i];
+    int* RATcls = (int*) (S->DB + S->RATset[i]);
     int id = RATcls[ID] >> 1;
     int blocked = 0;
     long int reason  = 0;
@@ -598,7 +593,7 @@ int checkRAT (struct solver *S, int pivot, int mark) {
       S->reason[abs (blocked)] = 0; }
 
     if (!blocked) {
-      RATcls = S->DB + S->RATset[i];
+      RATcls = (int*) (S->DB + S->RATset[i]);
       while (*RATcls) {
         int lit = *RATcls++;
         if (lit != -pivot && !S->falseA[lit]) {
@@ -871,7 +866,7 @@ int verify (struct solver *S, int begin, int end) {
           if (!(ad & 1))                          clause[ID] |= ACTIVE; } } }
     if (!S->backforce) {
       printf ("\rc ERROR: no conflict\n");
-//      return SAT;
+      return SAT;
     } }
 
   start_verification:;
@@ -1102,7 +1097,7 @@ int parse (struct solver* S) {
 
     if (size == 0) {
       if (fileSwitchFlag) { // read for proof
-        if (S->binMode) {
+        if (S->binMode == 1) {
           int res = getc_unlocked (S->proofFile);
           if      (res == EOF) break;
           else if (res ==  97) del = 0;
@@ -1120,7 +1115,7 @@ int parse (struct solver* S) {
     if (!lit) {
       if (!fileSwitchFlag) tmp = fscanf (S->inputFile, " %i ", &lit);  // Read a literal.
       else {
-        if (S->binMode) {
+        if (S->binMode == 1) {
           tmp = read_lit (S, &lit); }
         else {
           tmp = fscanf (S->proofFile, " %i ", &lit); } }
@@ -1202,9 +1197,6 @@ int parse (struct solver* S) {
       clause[ID] = 2 * S->count; S->count++;
       finalClause = S->mem_used + EXTRA - 1;
       if (S->mode == FORWARD_SAT) if (nZeros > 0) clause[ID] |= ACTIVE;
-#ifdef PARTIALPROOF
-      if (nZeros > 0) clause[ID] |= ACTIVE;
-#endif
 
       for (i = 0; i < size; ++i) { clause[ i ] = buffer[ i ]; } clause[ i ] = 0;
       S->mem_used += size + EXTRA;
@@ -1227,8 +1219,7 @@ int parse (struct solver* S) {
 
       if (nZeros <= 0) S->nLemmas++;
 
-      if (!nZeros) S->lemmas     = (long) (clause - S->DB); // S->lemmas is no longer pointer
-      if (!nZeros) S->firstLemma = (long) (clause - S->DB);
+      if (!nZeros) S->lemmas   = (long) (clause - S->DB); // S->lemmas is no longer pointer
       size = 0; del = 0; --nZeros; }                      // Reset buffer
    else {
      buffer[size++] = lit;                                // Add literal to buffer
@@ -1278,7 +1269,7 @@ int parse (struct solver* S) {
   S->optproof   = (long *) malloc (sizeof(long) * (2 * S->nLemmas + S->nClauses));
 
   S->maxRAT = INIT;
-  S->RATset = (int*) malloc (sizeof (int) * S->maxRAT);
+  S->RATset = (long*) malloc (sizeof (long) * S->maxRAT);
   for (i = 0; i < S->maxRAT; i++) S->RATset[i] = 0; // is this required?
 
   S->preRAT = (int*) malloc (sizeof (int) * n);
@@ -1344,6 +1335,7 @@ void printHelp ( ) {
   printf ("  -O          optimize proof till fixpoint by repeating verification\n");
   printf ("  -C          compress core lemmas (emit binary proof)\n");
   printf ("  -D          delete proof file after parsing\n");
+  printf ("  -I          force ASCII proof parse mode\n");
   printf ("  -i          force binary proof parse mode\n");
   printf ("  -w          suppress warning messages\n");
   printf ("  -W          exit after first warning\n");
@@ -1399,6 +1391,7 @@ int main (int argc, char** argv) {
       else if (argv[i][1] == 'C') S.binOutput  = 1;
       else if (argv[i][1] == 'D') S.delProof   = 1;
       else if (argv[i][1] == 'i') S.binMode    = 1;
+      else if (argv[i][1] == 'I') S.binMode    = -1;
       else if (argv[i][1] == 'u') S.mask       = 1;
       else if (argv[i][1] == 'v') S.verb       = 1;
       else if (argv[i][1] == 'w') S.warning    = NOWARNING;
@@ -1409,7 +1402,6 @@ int main (int argc, char** argv) {
       else if (argv[i][1] == 'S') S.mode       = FORWARD_SAT; }
     else {
       tmp++;
-
       if (tmp == 1) {
         S.inputFile = fopen (argv[1], "r");
         if (S.inputFile == NULL) {
@@ -1444,6 +1436,7 @@ int main (int argc, char** argv) {
               printf ("\rc turning on binary mode checking\n");
               S.binMode = 1; break; } } }
         fclose (S.proofFile);
+        if (S.binMode == -1) S.binMode = 0;
         S.proofFile = fopen (argv[2], "r");
         if (S.proofFile == NULL) {
           printf ("\rc error opening \"%s\".\n", argv[i]); return ERROR; } } } }
