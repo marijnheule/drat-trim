@@ -1188,7 +1188,7 @@ int parse (struct solver* S) {
         end_delete:;
         if (del) { del = 0; size = 0; continue; } }
 
-      if (S->mem_used + size + EXTRA > DBsize) { DBsize = (DBsize * 3) >> 1;
+      if (S->mem_used + size + EXTRA >= DBsize) { DBsize = (DBsize * 3) >> 1;
 	S->DB = (int *) realloc (S->DB, DBsize * sizeof (int));
 //        printf("c database increased to %li\n", DBsize);
         if (S->DB == NULL) { printf("c MEMOUT: reallocation of clause database failed\n"); exit (0); } }
