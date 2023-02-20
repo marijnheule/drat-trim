@@ -19,8 +19,10 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <assert.h>
 #include <sys/time.h>
 
@@ -1350,7 +1352,7 @@ int main (int argc, char** argv) {
   struct solver S;
 
   S.inputFile  = NULL;
-  S.proofFile  = stdin;
+  S.proofFile  = NULL;
   S.coreStr    = NULL;
   S.activeFile = NULL;
   S.lemmaStr   = NULL;
@@ -1374,84 +1376,174 @@ int main (int argc, char** argv) {
   S.binOutput  = 0;
   gettimeofday (&S.start_time, NULL);
 
-  int i, tmp = 0;
-  for (i = 1; i < argc; i++) {
-    if        (argv[i][0] == '-') {
-      if      (argv[i][1] == 'h') printHelp ();
-      else if (argv[i][1] == 'c') S.coreStr    = argv[++i];
-      else if (argv[i][1] == 'a') S.activeFile = fopen (argv[++i], "w");
-      else if (argv[i][1] == 'l') S.lemmaStr   = argv[++i];
-      else if (argv[i][1] == 'L') S.lratFile   = fopen (argv[++i], "w");
-      else if (argv[i][1] == 'r') S.traceFile  = fopen (argv[++i], "w");
-      else if (argv[i][1] == 't') S.timeout    = atoi (argv[++i]);
-      else if (argv[i][1] == 'b') S.bar        = 1;
-      else if (argv[i][1] == 'B') S.backforce  = 1;
-      else if (argv[i][1] == 'O') S.optimize   = 1;
-      else if (argv[i][1] == 'C') S.binOutput  = 1;
-      else if (argv[i][1] == 'D') S.delProof   = 1;
-      else if (argv[i][1] == 'i') S.binMode    = 1;
-      else if (argv[i][1] == 'u') S.mask       = 1;
-      else if (argv[i][1] == 'v') S.verb       = 1;
-      else if (argv[i][1] == 'w') S.warning    = NOWARNING;
-      else if (argv[i][1] == 'W') S.warning    = HARDWARNING;
-      else if (argv[i][1] == 'p') S.delete     = 0;
-      else if (argv[i][1] == 'R') S.reduce     = 0;
-      else if (argv[i][1] == 'f') S.mode       = FORWARD_UNSAT;
-      else if (argv[i][1] == 'S') S.mode       = FORWARD_SAT; }
-    else {
-      tmp++;
-      if (tmp == 1) {
-        S.inputFile = fopen (argv[1], "r");
-        if (S.inputFile == NULL) {
-          printf ("\rc error opening \"%s\".\n", argv[i]); return ERROR; } }
+  int option_character;
+  int argument_index;
 
-      else if (tmp == 2) {
-        S.proofFile = fopen (argv[2], "r");
-        if (S.proofFile == NULL) {
-          printf ("\rc error opening \"%s\".\n", argv[i]); return ERROR; }
+  while ((option_character = getopt(argc, argv, "hc:a:l:L:r:t:bBOCDiuvwWpRfS")) != -1) {
+    switch (option_character) {
+      case 'h':
+        printHelp();
+        return 0;
+      case 'c':
+        S.coreStr = optarg;
+        break;
+      case 'a':
+        S.activeFile = fopen(optarg, "w");
+        break;
+      case 'l':
+        S.lemmaStr = optarg;
+        break;
+      case 'L':
+        S.lratFile = fopen(optarg, "w");
+        break;
+      case 'r':
+        S.traceFile = fopen(optarg, "w");
+        break;
+      case 't':
+        S.timeout = atoi(optarg);
+        break;
+      case 'b':
+        S.bar = 1;
+        break;
+      case 'B':
+        S.backforce = 1;
+        break;
+      case 'O':
+        S.optimize = 1;
+        break;
+      case 'C':
+        S.binOutput = 1;
+        break;
+      case 'D':
+        S.delProof = 1;
+        break;
+      case 'i':
+        S.binMode = 1;
+        break;
+      case 'u':
+        S.mask = 1;
+        break;
+      case 'v':
+        S.verb = 1;
+        break;
+      case 'w':
+        S.warning = NOWARNING;
+        break;
+      case 'W':
+        S.warning = HARDWARNING;
+        break;
+      case 'p':
+        S.delete = 0;
+        break;
+      case 'R':
+        S.reduce = 0;
+        break;
+      case 'f':
+        S.mode = FORWARD_UNSAT;
+        break;
+      case 'S':
+        S.mode = FORWARD_SAT;
+        break;
+      case '?':
+        if (optopt == 'c')
+          printf("c Option -%option_character requires an argument.\n", optopt);
+        else if (isprint(optopt))
+          printf("c Unknown option `-%option_character'.\n", optopt);
+        else
+          printf("c Unknown option character `\\x%x'.\n", optopt);
+        return ERROR;
+      default:
+        abort();
+    }
+  }
 
-       int c, comment = 1;
-       if (S.binMode == 0) {
-          c = getc_unlocked (S.proofFile); // check the first character in the file
-          if (c == EOF) { S.binMode = 1; continue; }
-          if ((c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (c != 99) && (c != 100)) {
-             printf ("\rc turning on binary mode checking\n");
-             S.binMode = 1; }
-          if (c != 99) comment = 0; }
-        if (S.binMode == 0) {
-          c = getc_unlocked (S.proofFile); // check the second character in the file
-          if (c == EOF) { S.binMode = 1; continue; }
-          if ((c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (c != 99) && (c != 100)) {
-             printf ("\rc turning on binary mode checking\n");
-             S.binMode = 1; }
-          if (c != 32) comment = 0; }
-        if (S.binMode == 0) {
-          int j;
-          for (j = 0; j < 10; j++) {
-            c = getc_unlocked (S.proofFile);
-            if (c == EOF) break;
-            if ((c != 100) && (c != 10) && (c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (comment && ((c < 65) || (c > 122))))  {
-              printf ("\rc turning on binary mode checking\n");
-              S.binMode = 1; break; } } }
-        fclose (S.proofFile);
-        S.proofFile = fopen (argv[2], "r");
-        if (S.proofFile == NULL) {
-          printf ("\rc error opening \"%s\".\n", argv[i]); return ERROR; } } } }
+  argument_index = optind;
+  if ((argc - argument_index) < 1) {
+    printf("c Must supply at least one positional argument for the input file.\n");
+    return ERROR;
+  }
+  if ((argc - argument_index) > 2) {
+    printf("c Got too many positional arguments - expected only input file and optional proof file path.\n");
+    return ERROR;
+  }
 
-  if (tmp == 1) printf ("\rc reading proof from stdin\n");
-  if (tmp == 0) printHelp ();
 
-  int parseReturnValue = parse (&S);
+  S.inputFile = fopen(argv[argument_index], "r");
+  if (S.inputFile == NULL) {
+    printf("\rc error opening \"%s\".\n", argv[argument_index]);
+    return ERROR;
+  }
 
-  fclose (S.inputFile);
-  fclose (S.proofFile);
+  if ((argc - argument_index) == 2) {
+    S.proofFile = fopen(argv[argument_index + 1], "r");
+    if (S.proofFile == NULL) {
+      printf("\rc error opening \"%s\".\n", argv[argument_index + 1]);
+      return ERROR;
+    }
+
+    int c, comment = 1;
+    if (S.binMode == 0) {
+      c = getc_unlocked (S.proofFile); // check the first character in the file
+      if (c == EOF) {
+        S.binMode = 1;
+      } else if ((c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (c != 99) && (c != 100)) {
+        printf("\rc turning on binary mode checking\n");
+        S.binMode = 1;
+      } else if (c != 99) {
+        comment = 0;
+      }
+    }
+
+    if (S.binMode == 0) {
+      c = getc_unlocked (S.proofFile); // check the second character in the file
+      if (c == EOF) {
+        S.binMode = 1;
+      } else if ((c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (c != 99) && (c != 100)) {
+        printf("\rc turning on binary mode checking\n");
+        S.binMode = 1;
+      } else if (c != 32) {
+        comment = 0;
+      }
+    }
+
+    if (S.binMode == 0) {
+      int j;
+      for (j = 0; j < 10; j++) {
+        c = getc_unlocked (S.proofFile);
+        if (c == EOF) break;
+        if ((c != 100) && (c != 10) && (c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) &&
+            (comment && ((c < 65) || (c > 122)))) {
+          printf("\rc turning on binary mode checking\n");
+          S.binMode = 1;
+          break;
+        }
+      }
+    }
+
+    fclose(S.proofFile);
+    S.proofFile = fopen(argv[argument_index + 1], "r");
+    if (S.proofFile == NULL) {
+      printf("\rc error opening \"%s\".\n", argv[argument_index + 1]);
+      return ERROR;
+    }
+  } else {
+    printf("\rc reading proof from stdin\n");
+    S.proofFile = stdin;
+  }
+
+  int parseReturnValue = parse(&S);
+
+  fclose(S.inputFile);
+  fclose(S.proofFile);
 
   if (S.mode == FORWARD_UNSAT) {
-    S.reduce = 0; }
+    S.reduce = 0;
+  }
 
-  if (S.delProof && argv[2] != NULL) {
-    int ret = remove(argv[2]);
-    if (ret == 0) printf("c deleted proof %s\n", argv[2]); }
+  if (S.delProof && ((argc - argument_index) == 2)) {
+    int ret = remove(argv[argument_index + 1]);
+    if (ret == 0) printf("c deleted proof %s\n", argv[argument_index + 1]);
+  }
 
   int sts = ERROR;
   if       (parseReturnValue == ERROR)          printf ("\rs MEMORY ALLOCATION ERROR\n");
