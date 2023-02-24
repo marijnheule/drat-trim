@@ -82,7 +82,6 @@ static inline void printClause (int* clause) {
 static inline void addWatchPtr (struct solver* S, int lit, long watch) {
   if (S->used[lit] + 1 == S->max[lit]) { S->max[lit] *= 1.5;
     S->wlist[lit] = (long *) realloc (S->wlist[lit], sizeof (long) * S->max[lit]);
-//    if (S->max[lit] > 1000) printf("c watchlist %i increased to %i\n", lit, S->max[lit]);
     if (S->wlist[lit] == NULL) { printf("c MEMOUT: reallocation failed for watch list of %i\n", lit); exit (0); } }
   S->wlist[lit][ S->used[lit]++ ] = watch | S->mask;
   S->wlist[lit][ S->used[lit]   ] = END; }
@@ -107,7 +106,9 @@ static inline void addUnit (struct solver* S, long index) {
 //  printf("c adding unit %i\n", S->DB[index]);
   if (S->unitSize >= S->unitStackSize) {
     S->unitStackSize = (S->unitStackSize * 3) >> 1;
-    S->unitStack = (long*) realloc (S->unitStack, sizeof(long) * S->unitStackSize); }
+    S->unitStack = (long*) realloc (S->unitStack, sizeof(long) * S->unitStackSize);
+    if (S->unitStack == NULL) {
+      printf ("c failed to reallocate unit stack\n"); exit (0); } }
   S->unitStack[S->unitSize++] = index; }
 
 static inline void removeUnit (struct solver* S, int lit) {
@@ -450,7 +451,9 @@ void postprocess (struct solver *S) {
 void lratAdd (struct solver *S, int elem) {
   if (S->lratSize == S->lratAlloc) {
     S->lratAlloc = S->lratAlloc * 3 >> 1;
-    S->lratTable = (int *) realloc (S->lratTable, sizeof (int) * S->lratAlloc); }
+    S->lratTable = (int *) realloc (S->lratTable, sizeof (int) * S->lratAlloc);
+    if (S->lratTable == NULL) {
+      printf ("c MEMOUT: failed to reallocate lrat table\n"); exit (0); } }
   S->lratTable[S->lratSize++] = elem; }
 
 void printDependenciesFile (struct solver *S, int* clause, int RATflag, int mode) {
@@ -1214,7 +1217,7 @@ int parse (struct solver* S) {
         if (S->nStep == S->nAlloc) { S->nAlloc = (S->nAlloc * 3) >> 1;
           S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc);
 //        printf ("c proof allocation increased to %li\n", S->nAlloc);
-        if (S->proof == NULL) { printf("c MEMOUT: reallocation of proof list failed\n"); exit (0); } }
+          if (S->proof == NULL) { printf("c MEMOUT: reallocation of proof list failed\n"); exit (0); } }
         S->proof[S->nStep++] = (((long) (clause - S->DB)) << INFOBITS); }
 
       if (nZeros <= 0) S->nLemmas++;
@@ -1224,7 +1227,9 @@ int parse (struct solver* S) {
    else {
      buffer[size++] = lit;                                // Add literal to buffer
      if (size == bufferAlloc) { bufferAlloc = (bufferAlloc * 3) >> 1;
-       buffer = (int*) realloc (buffer, sizeof (int) * bufferAlloc); } } }
+       buffer = (int*) realloc (buffer, sizeof (int) * bufferAlloc);
+       if (buffer == NULL) {
+        printf ("c MEMOUT: failed to reallocate buffer\n"); exit (0); } } } }
 
   if (S->mode == FORWARD_SAT && active) {
     if (S->warning != NOWARNING)
@@ -1243,6 +1248,7 @@ int parse (struct solver* S) {
         S->proof[S->nStep++] = (((long) (clause - S->DB)) << INFOBITS) + 1; } } }
 
   S->DB = (int *) realloc (S->DB, S->mem_used * sizeof (int));
+  if (S->DB == NULL) { printf("c MEMOUT: reallocation of DB failed\n"); exit (0); }
 
   for (i = 0; i < BIGINIT; i++) free (hashTable[i]);
   free (hashTable);
