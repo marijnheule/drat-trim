@@ -1097,7 +1097,7 @@ int parse (struct solver* S) {
 
     if (size == 0) {
       if (fileSwitchFlag) { // read for proof
-        if (S->binMode) {
+        if (S->binMode == 1) {
           int res = getc_unlocked (S->proofFile);
           if      (res == EOF) break;
           else if (res ==  97) del = 0;
@@ -1115,7 +1115,7 @@ int parse (struct solver* S) {
     if (!lit) {
       if (!fileSwitchFlag) tmp = fscanf (S->inputFile, " %i ", &lit);  // Read a literal.
       else {
-        if (S->binMode) {
+        if (S->binMode == 1) {
           tmp = read_lit (S, &lit); }
         else {
           tmp = fscanf (S->proofFile, " %i ", &lit); } }
@@ -1240,7 +1240,7 @@ int parse (struct solver* S) {
           S->proof = (long*) realloc (S->proof, sizeof (long) * S->nAlloc);
 //          printf ("c proof allocation increased to %li\n", S->nAlloc);
           if (S->proof == NULL) { printf("c MEMOUT: reallocation of proof list failed\n"); exit (0); } }
-        S->proof[S->nStep++] = (((int) (clause - S->DB)) << INFOBITS) + 1; } } }
+        S->proof[S->nStep++] = (((long) (clause - S->DB)) << INFOBITS) + 1; } } }
 
   S->DB = (int *) realloc (S->DB, S->mem_used * sizeof (int));
 
@@ -1335,6 +1335,7 @@ void printHelp ( ) {
   printf ("  -O          optimize proof till fixpoint by repeating verification\n");
   printf ("  -C          compress core lemmas (emit binary proof)\n");
   printf ("  -D          delete proof file after parsing\n");
+  printf ("  -I          force ASCII proof parse mode\n");
   printf ("  -i          force binary proof parse mode\n");
   printf ("  -w          suppress warning messages\n");
   printf ("  -W          exit after first warning\n");
@@ -1390,6 +1391,7 @@ int main (int argc, char** argv) {
       else if (argv[i][1] == 'C') S.binOutput  = 1;
       else if (argv[i][1] == 'D') S.delProof   = 1;
       else if (argv[i][1] == 'i') S.binMode    = 1;
+      else if (argv[i][1] == 'I') S.binMode    = -1;
       else if (argv[i][1] == 'u') S.mask       = 1;
       else if (argv[i][1] == 'v') S.verb       = 1;
       else if (argv[i][1] == 'w') S.warning    = NOWARNING;
@@ -1434,6 +1436,7 @@ int main (int argc, char** argv) {
               printf ("\rc turning on binary mode checking\n");
               S.binMode = 1; break; } } }
         fclose (S.proofFile);
+        if (S.binMode == -1) S.binMode = 0;
         S.proofFile = fopen (argv[2], "r");
         if (S.proofFile == NULL) {
           printf ("\rc error opening \"%s\".\n", argv[i]); return ERROR; } } } }
