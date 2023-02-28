@@ -1130,7 +1130,7 @@ int parse (struct solver* S) {
         fileLine = 0;
         fileSwitchFlag = 1; } }
 
-    if (!tmp && !S.binMode) {
+    if (!tmp && !S->binMode) {
       char ignore[1<<16];
       if (!fileSwitchFlag) { if (fgets (ignore, sizeof (ignore), S->inputFile) == NULL) printf ("c\n"); }
       else                   if (fgets (ignore, sizeof (ignore), S->proofFile) == NULL) printf ("c\n");
