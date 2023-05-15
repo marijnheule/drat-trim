@@ -1,12 +1,15 @@
 FLAGS = -DLONGTYPE
 
-all: drat-trim drat-trim-riscv #lrat-check compress decompress gapless
+all: drat-trim drat-trim-riscv drat-trim-riscv-native #lrat-check compress decompress gapless
 
 drat-trim: drat-trim.c
 	gcc drat-trim.c -std=c99 -O2 -o drat-trim
 
 drat-trim-riscv: drat-trim.c riscv-compat.h
 	clang-11 -DRISCV drat-trim.c -std=c99 -O2 -o drat-trim.S --target=riscv32 -S
+
+drat-trim-riscv-native: drat-trim.c riscv-compat.h
+	gcc -DRISCV drat-trim.c -std=c99 -O2 -o drat-trim-riscv-native
 
 lrat-check: lrat-check.c
 	gcc lrat-check.c -std=c99 $(FLAGS) -O2 -o lrat-check
