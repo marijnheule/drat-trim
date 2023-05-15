@@ -19,10 +19,16 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <sys/time.h>
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <assert.h>
+// #include <sys/time.h>
+
+#define NULL 0
+typedef int FILE;
+#define EOF -1
+#define stdin 1
+#define RAND_MAX 0xffff
 
 //#define PARTIALPROOF
 
@@ -62,7 +68,7 @@ struct solver { FILE *inputFile, *proofFile, *lratFile, *traceFile, *activeFile;
       *dependencies, maxVar, maxSize, mode, verb, unitSize, unitStackSize, prep, *current, nRemoved, warning,
       delProof, *setMap, *setTruth;
     char *coreStr, *lemmaStr;
-    struct timeval start_time;
+    //struct timeval start_time;
     long mem_used, time, nClauses, nStep, nOpt, nAlloc, *unitStack, *reason, lemmas, nResolve, *RATset,
          nReads, nWrites, lratSize, lratAlloc, *lratLookup, **wlist, *optproof, *formula, *proof;  };
 
@@ -893,28 +899,28 @@ int verify (struct solver *S, int begin, int end) {
 
   double max = (double) adds;
 
-  struct timeval backward_time;
-  gettimeofday (&backward_time, NULL);
+  // struct timeval backward_time;
+  // gettimeofday (&backward_time, NULL);
   for (; step >= 0; step--) {
-    struct timeval current_time;
-    gettimeofday (&current_time, NULL);
-    int seconds = (int) (current_time.tv_sec - S->start_time.tv_sec);
-    if ((seconds > S->timeout) && (S->optimize == 0)) printf ("s TIMEOUT\n"), exit (0);
+    // struct timeval current_time;
+    // gettimeofday (&current_time, NULL);
+    // int seconds = (int) (current_time.tv_sec - S->start_time.tv_sec);
+    // if ((seconds > S->timeout) && (S->optimize == 0)) printf ("s TIMEOUT\n"), exit (0);
 
-    if (S->bar)
-      if ((adds % 1000) == 0) {
-        int f;
-        long runtime = (current_time.tv_sec  - backward_time.tv_sec ) * 1000000 +
-                       (current_time.tv_usec - backward_time.tv_usec);
-        double time = (double) (runtime / 1000000.0);
-        double fraction = (adds * 1.0) / max;
-        printf("\rc %.2f%% [", 100.0 * (1.0 - fraction));
-        for (f = 1; f <= 20; f++) {
-          if ((1.0 - fraction) * 20.0 < 1.0 * f) printf(" ");
-          else printf("="); }
-        printf("] time remaining: %.2f seconds ", time / (1.0 - fraction) - time);
-        if (step == 0) printf("\n");
-        fflush (stdout); }
+//    if (S->bar)
+      // if ((adds % 1000) == 0) {
+      //   int f;
+      //   long runtime = (current_time.tv_sec  - backward_time.tv_sec ) * 1000000 +
+      //                  (current_time.tv_usec - backward_time.tv_usec);
+      //   double time = (double) (runtime / 1000000.0);
+      //   double fraction = (adds * 1.0) / max;
+      //   printf("\rc %.2f%% [", 100.0 * (1.0 - fraction));
+      //   for (f = 1; f <= 20; f++) {
+      //     if ((1.0 - fraction) * 20.0 < 1.0 * f) printf(" ");
+      //     else printf("="); }
+      //   printf("] time remaining: %.2f seconds ", time / (1.0 - fraction) - time);
+      //   if (step == 0) printf("\n");
+      //   fflush (stdout); }
 
     long ad = S->proof[step]; long d = ad & 1;
     int *clause = S->DB + (ad >> INFOBITS);
@@ -1379,7 +1385,7 @@ int main (int argc, char** argv) {
   S.reduce     = 1;
   S.binMode    = 0;
   S.binOutput  = 0;
-  gettimeofday (&S.start_time, NULL);
+  // gettimeofday (&S.start_time, NULL);
 
   int i, tmp = 0;
   for (i = 1; i < argc; i++) {
@@ -1468,11 +1474,11 @@ int main (int argc, char** argv) {
   else if  ((sts = verify (&S, -1, -1)) == UNSAT) printf ("\rs VERIFIED\n");
   else if  (sts == DERIVATION)                  printf ("\rs DERIVATION\n");
   else printf ("\ns NOT VERIFIED\n")  ;
-  struct timeval current_time;
-  gettimeofday (&current_time, NULL);
-  long runtime = (current_time.tv_sec  - S.start_time.tv_sec) * 1000000 +
-                 (current_time.tv_usec - S.start_time.tv_usec);
-  printf ("\rc verification time: %.3f seconds\n", (double) (runtime / 1000000.0));
+  // struct timeval current_time;
+  // gettimeofday (&current_time, NULL);
+  // long runtime = (current_time.tv_sec  - S.start_time.tv_sec) * 1000000 +
+  //                (current_time.tv_usec - S.start_time.tv_usec);
+  // printf ("\rc verification time: %.3f seconds\n", (double) (runtime / 1000000.0));
 
   if (S.optimize) {
     printf("c proof optimization started (ignoring the timeout)\n");
