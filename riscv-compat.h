@@ -6,6 +6,9 @@
 #define stdin 1
 #define RAND_MAX 0xffff
 
+void assert(int c) {
+    if (!c) exit(1);
+}
 struct FILE_s {
   unsigned char* data;
   unsigned pos;
@@ -13,6 +16,8 @@ struct FILE_s {
 };
 
 typedef struct FILE_s FILE;
+
+#define EOF (-1)
 
 int strcmp(const char* a, const char* b) {
     while (*a == *b) {
@@ -41,6 +46,8 @@ FILE *fopen (const char *filename, const char* mode) {
     }
 }
 
+int fclose(FILE* f) { return 0; }
+
 int getc_unlocked(FILE* f) {
   if (f->pos >= f->len) {
     return EOF;
@@ -50,6 +57,23 @@ int getc_unlocked(FILE* f) {
   }
 }
 
-void assert(int c) {
-    if (!c) exit(1);
+int fscanf_1(FILE* f, const char* format, int* a, long* b)
+{
+    assert(strcmp(format, " cnf %i %li \n") == 0);
 }
+
+int fscanf_2(FILE* f, const char* format)
+{
+    assert(strcmp(format, "%*s\n") == 0);
+}
+
+int fscanf_3(FILE* f, const char* format, int* a)
+{
+    assert(strcmp(format, " d %i ") == 0);
+}
+
+int fscanf_4(FILE* f, const char* format, int* a)
+{
+    assert(strcmp(format, " %i ") == 0);
+}
+

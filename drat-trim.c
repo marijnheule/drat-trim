@@ -30,6 +30,11 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <assert.h>
 #include <sys/time.h>
 
+#define fscanf_1 fscanf
+#define fscanf_2 fscanf
+#define fscanf_3 fscanf
+#define fscanf_4 fscanf
+
 #endif
 
 //#define PARTIALPROOF
@@ -1061,8 +1066,8 @@ int parse (struct solver* S) {
 
   S->nVars    = 0;
   S->nClauses = 0;
-  do { tmp = fscanf (S->inputFile, " cnf %i %li \n", &S->nVars, &S->nClauses); // Read the first line
-    if (tmp > 0 && tmp != EOF) break; tmp = fscanf (S->inputFile, "%*s\n"); }  // In case a commment line was found
+  do { tmp = fscanf_1 (S->inputFile, " cnf %i %li \n", &S->nVars, &S->nClauses); // Read the first line
+    if (tmp > 0 && tmp != EOF) break; tmp = fscanf_2 (S->inputFile, "%*s\n"); }  // In case a commment line was found
   while (tmp != 2 && tmp != EOF);                                              // Skip it and read next line
   int nZeros = S->nClauses;
 
@@ -1119,17 +1124,17 @@ int parse (struct solver* S) {
             if (S->warning == HARDWARNING) exit (HARDWARNING); }
           S->nReads++; }
         else {
-          tmp = fscanf (S->proofFile, " d  %i ", &lit);
+          tmp = fscanf_3 (S->proofFile, " d  %i ", &lit);
           if (tmp == EOF) break;
           del = tmp > 0; } } }
 
     if (!lit) {
-      if (!fileSwitchFlag) tmp = fscanf (S->inputFile, " %i ", &lit);  // Read a literal.
+      if (!fileSwitchFlag) tmp = fscanf_4 (S->inputFile, " %i ", &lit);  // Read a literal.
       else {
         if (S->binMode == 1) {
           tmp = read_lit (S, &lit); }
         else {
-          tmp = fscanf (S->proofFile, " %i ", &lit); } }
+          tmp = fscanf_4 (S->proofFile, " %i ", &lit); } }
       if (tmp == EOF && !fileSwitchFlag) {
         if (S->warning != NOWARNING) {
           printf ("\rc WARNING: early EOF of the input formula\n");
