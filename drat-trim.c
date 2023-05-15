@@ -1066,7 +1066,7 @@ int parse (struct solver* S) {
 
   S->nVars    = 0;
   S->nClauses = 0;
-  do { tmp = fscanf_1 (S->inputFile, " cnf %i %li \n", &S->nVars, &S->nClauses); // Read the first line
+  do { tmp = fscanf_1 (S->inputFile, "p cnf %i %li \n", &S->nVars, &S->nClauses); // Read the first line
     if (tmp > 0 && tmp != EOF) break; tmp = fscanf_2 (S->inputFile, "%*s\n"); }  // In case a commment line was found
   while (tmp != 2 && tmp != EOF);                                              // Skip it and read next line
   int nZeros = S->nClauses;
