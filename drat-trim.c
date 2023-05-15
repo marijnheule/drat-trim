@@ -19,16 +19,18 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <sys/time.h>
+#ifdef RISCV
 
-#define NULL 0
-typedef int FILE;
-#define EOF -1
-#define stdin 1
-#define RAND_MAX 0xffff
+#include "riscv-compat.h"
+
+#else
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <sys/time.h>
+
+#endif
 
 //#define PARTIALPROOF
 
