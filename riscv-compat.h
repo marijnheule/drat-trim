@@ -96,6 +96,7 @@ void skip_whitespace(FILE* f)
 
 int fscanf_long(FILE* f, long* a)
 {
+    *a = 0;
     skip_whitespace(f);
 
     if (is_eof(f)) return EOF;
@@ -113,14 +114,14 @@ int fscanf_long(FILE* f, long* a)
     if (c < '0' || c > '9') return 0;
 
     // TODO overflow
-    // TODO negative values
     long x = 0;
-    while (c >= '0' && c <= '9')
+    while (c >= '0' && c <= '9' && c != EOF)
     {
         advance(f);
         x = x * 10 + (c - '0');
-        long c = peek(f);
+        c = peek(f);
     }
+    if (negative) x = -x;
     *a = x;
     skip_whitespace(f);
     return 1;
@@ -181,7 +182,7 @@ int fscanf_2(FILE* f, const char* format)
 
 int fscanf_3(FILE* f, const char* format, int* a)
 {
-    assert(strcmp(format, " d %i ") == 0);
+    assert(strcmp(format, " d  %i ") == 0);
     skip_whitespace(f);
     if (peek(f) == 'd') {
         advance(f);
