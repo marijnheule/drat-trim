@@ -5,6 +5,9 @@
 #define stdin NULL
 #define RAND_MAX 0xffff
 
+typedef unsigned size_t;
+typedef int ssize_t;
+
 int main (int argc, char** argv);
 
 void __runtime_start() {
@@ -309,4 +312,15 @@ int atoi(const char* s) {
     }
     if (negative) x = -x;
     return x;
+}
+
+void exit(int status) {
+    // TODO take status into account
+    // but drat-trim does actually not always properly report the status.
+    while (1) {}
+}
+
+// These are not really needed
+int remove(const char* path) {
+    exit(1);
 }
