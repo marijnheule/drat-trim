@@ -5,6 +5,11 @@
 #define stdin NULL
 #define RAND_MAX 0xffff
 
+int main (int argc, char** argv);
+
+void __runtime_start() {
+    main(0, 0);
+}
 
 void assert(int c)
 {
@@ -197,3 +202,29 @@ extern int long write(int fd, const void *buf, unsigned long count);
 
 // TODO do not ignore the actual values
 #define printf(fmt, ...) write(0, fmt, sizeof(fmt) + 1)
+
+int atoi(const char* s) {
+    while (isspace(*s))
+        s++;
+
+    if (*s == 0) return 0;
+
+    int negative = 0;
+    if (*s == '-')
+    {
+        negative = 1;
+        s++;
+    }
+
+    if (*s < '0' || *s > '9') return 0;
+
+    // TODO overflow
+    int x = 0;
+    while (*s >= '0' && *s <= '9')
+    {
+        x = x * 10 + (*s - '0');
+        s++;
+    }
+    if (negative) x = -x;
+    return x;
+}
