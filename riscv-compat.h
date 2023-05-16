@@ -16,6 +16,88 @@ void assert(int c)
     if (!c) exit(1);
 }
 
+#define MEMORY_SIZE 0x40000000
+static unsigned char memory[MEMORY_SIZE];
+static unsigned char* bump_ptr = memory;
+
+void* malloc(unsigned size) {
+    unsigned aligned_size = (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1) + sizeof(unsigned);
+
+    if ((bump_ptr + aligned_size) > (memory + MEMORY_SIZE)) {
+        // TODO better to panic right away.
+        // Out of memory
+        return NULL;
+    }
+
+    // Allocate memory from the bump pointer
+    void* allocated_mem = bump_ptr;
+    bump_ptr += aligned_size;
+
+    *((unsigned*) allocated_mem) = size;
+    return (void*)((char*)allocated_mem + sizeof(unsigned));
+}
+
+void free(void* ptr) {}
+
+void* memcpy(void* destination, const void* source, unsigned num) {
+    unsigned char* dest = (unsigned char*)destination;
+    const unsigned char* src = (const unsigned char*)source;
+
+    if ((((unsigned)dest & 3) == 0) && (((unsigned)src & 3) == 0) && (num >= 4)) {
+        unsigned* dest_word = (unsigned*)dest;
+        const unsigned* src_word = (const unsigned*)src;
+        unsigned num_words = num / sizeof(unsigned);
+
+        // Copy whole words
+        for (unsigned i = 0; i < num_words; i++) {
+            dest_word[i] = src_word[i];
+        }
+
+        // Calculate the remaining bytes to copy
+        unsigned remaining_bytes = num - (num_words * 4);
+        dest += num_words * 4;
+        src += num_words * 4;
+
+        // Copy the remaining bytes
+        for (unsigned i = 0; i < remaining_bytes; i++) {
+            dest[i] = src[i];
+        }
+    } else {
+        // Copy byte by byte
+        for (unsigned i = 0; i < num; i++) {
+            dest[i] = src[i];
+        }
+    }
+
+    return destination;
+}
+
+void* realloc(void* ptr, unsigned size) {
+    if (ptr == NULL) {
+        return malloc(size);
+    }
+
+    if (size == 0) {
+        free(ptr);
+        return NULL;
+    }
+
+    void* new_ptr = malloc(size);
+    if (new_ptr != NULL) {
+        // Copy the data from the old memory block to the new memory block
+        unsigned old_size = *(unsigned*)((char*) ptr - sizeof(unsigned));
+        unsigned copy_size = (old_size < size) ? old_size : size;
+        memcpy(new_ptr, ptr, copy_size);
+
+        // Free the old memory block
+        free(ptr);
+    }
+
+    return new_ptr;
+}
+
+
+
 struct FILE_s {
   unsigned char* data;
   unsigned pos;

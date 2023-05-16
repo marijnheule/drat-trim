@@ -23,5 +23,8 @@ decompress: decompress.c
 gapless: gapless.c
 	gcc gapless.c -std=c99 -O2 -o gapless
 
+test: drat-trim-riscv-native
+	./drat-trim-riscv-native uuf-30-1.cnf uuf-30-1.drat
+
 clean:
 	rm drat-trim lrat-check compress decompress gapless
