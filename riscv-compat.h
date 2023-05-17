@@ -301,6 +301,10 @@ int long write(int fd, const void *buf, unsigned long count) {
     return count;
 }
 
+int puts(const char* s) {
+    printf("called puts\n");
+    exit(1);
+}
 #endif
 
 // TODO do not ignore the actual values
