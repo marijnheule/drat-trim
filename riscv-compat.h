@@ -10,6 +10,12 @@ typedef int ssize_t;
 
 int main (int argc, char** argv);
 
+void exit(int status) {
+    // TODO take status into account
+    // but drat-trim does actually not always properly report the status.
+    while (1) {}
+}
+
 // TODO do not ignore the actual values
 #define printf(fmt, ...) write(0, fmt, sizeof(fmt) + 1)
 
@@ -366,11 +372,6 @@ int atoi(const char* s) {
     return x;
 }
 
-void exit(int status) {
-    // TODO take status into account
-    // but drat-trim does actually not always properly report the status.
-    while (1) {}
-}
 
 // These are not really needed
 int remove(const char* path) {
