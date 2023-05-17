@@ -11,7 +11,7 @@ typedef int ssize_t;
 int main (int argc, char** argv);
 
 void __runtime_start() {
-    const char* argv[] = {"", "uuf-30-1.cnf", "uuf-30-1.drat"};
+    char* argv[] = {"", "uuf-30-1.cnf", "uuf-30-1.drat"};
     main(3, argv);
 }
 
@@ -290,6 +290,7 @@ extern int long write(int fd, const void *buf, unsigned long count);
 int putchar(int c) {
     register unsigned value __asm__("a0") = (unsigned)c;
     __asm__ volatile("ebreak" : : "r"(value));
+    return c;
 }
 
 int long write(int fd, const void *buf, unsigned long count) {
@@ -297,6 +298,7 @@ int long write(int fd, const void *buf, unsigned long count) {
         char c = ((const char*)buf)[i];
         putchar(c);
     }
+    return count;
 }
 
 #endif
@@ -309,6 +311,21 @@ int long write(int fd, const void *buf, unsigned long count) {
 
 int fputc(int c, FILE* stream) {
     // TODO implement?
+    return 0;
+}
+
+char *fgets(char *s, int size, FILE *stream) {
+    // TODO implement
+    return 0;
+}
+
+int rand() {
+    // TODO
+    return 3;
+}
+
+int abs(int x) {
+    return x >= 0 ? x : -x;
 }
 
 int atoi(const char* s) {
