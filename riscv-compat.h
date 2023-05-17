@@ -11,7 +11,8 @@ typedef int ssize_t;
 int main (int argc, char** argv);
 
 void __runtime_start() {
-    main(0, 0);
+    const char* argv[] = {"", "uuf-30-1.cnf", "uuf-30-1.drat"};
+    main(3, argv);
 }
 
 void assert(int c)
