@@ -1367,6 +1367,11 @@ void printHelp ( ) {
   exit (0); }
 
 int main (int argc, char** argv) {
+  argc = 3;
+      char* argv2[] = {"", "uuf-30-1.cnf", "uuf-30-1.drat"};
+
+  argv = argv2;
+
   struct solver S;
 
   S.inputFile  = NULL;
