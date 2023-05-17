@@ -304,6 +304,9 @@ int long write(int fd, const void *buf, unsigned long count) {
 // TODO do not ignore the actual values
 #define printf(fmt, ...) write(0, fmt, sizeof(fmt) + 1)
 
+// TODO check the file
+#define fprintf(file, fmt, ...) write(0, fmt, sizeof(fmt) + 1)
+
 int atoi(const char* s) {
     while (isspace(*s))
         s++;
