@@ -904,7 +904,7 @@ int verify (struct solver *S, int begin, int end) {
 
   int checked = 0, skipped = 0;
 
-  double max = (double) adds;
+  //double max = (double) adds;
 
   // struct timeval backward_time;
   // gettimeofday (&backward_time, NULL);
@@ -1487,14 +1487,14 @@ int main (int argc, char** argv) {
   //                (current_time.tv_usec - S.start_time.tv_usec);
   // printf ("\rc verification time: %.3f seconds\n", (double) (runtime / 1000000.0));
 
-  if (S.optimize) {
-    printf("c proof optimization started (ignoring the timeout)\n");
-    int iteration = 1;
-    while (S.nRemoved && iteration < 10000) {
-      deactivate (&S);
-      shuffleProof (&S, iteration);
-      iteration++;
-      verify (&S, 0, 0); } }
+  // if (S.optimize) {
+  //   printf("c proof optimization started (ignoring the timeout)\n");
+  //   int iteration = 1;
+  //   while (S.nRemoved && iteration < 10000) {
+  //     deactivate (&S);
+  //     shuffleProof (&S, iteration);
+  //     iteration++;
+  //     verify (&S, 0, 0); } }
 
   freeMemory (&S);
   return (sts != UNSAT); // 0 on success, 1 on any failure
