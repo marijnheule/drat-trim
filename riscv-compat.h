@@ -307,6 +307,10 @@ int long write(int fd, const void *buf, unsigned long count) {
 // TODO check the file
 #define fprintf(file, fmt, ...) write(0, fmt, sizeof(fmt) + 1)
 
+int fputc(int c, FILE* stream) {
+    // TODO implement?
+}
+
 int atoi(const char* s) {
     while (isspace(*s))
         s++;
