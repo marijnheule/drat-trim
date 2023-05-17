@@ -10,9 +10,22 @@ typedef int ssize_t;
 
 int main (int argc, char** argv);
 
+// TODO do not ignore the actual values
+#define printf(fmt, ...) write(0, fmt, sizeof(fmt) + 1)
+
+// TODO check the file
+#define fprintf(file, fmt, ...) write(0, fmt, sizeof(fmt) + 1)
+
+#ifdef RISCV_SIM
+extern int long write(int fd, const void *buf, unsigned long count);
+#else
+int long write(int fd, const void *buf, unsigned long count);
+#endif
+
 void __runtime_start() {
     char* argv[] = {"", "uuf-30-1.cnf", "uuf-30-1.drat"};
     main(3, argv);
+    while (1) {}
 }
 
 void assert(int c)
@@ -307,11 +320,6 @@ int puts(const char* s) {
 }
 #endif
 
-// TODO do not ignore the actual values
-#define printf(fmt, ...) write(0, fmt, sizeof(fmt) + 1)
-
-// TODO check the file
-#define fprintf(file, fmt, ...) write(0, fmt, sizeof(fmt) + 1)
 
 int fputc(int c, FILE* stream) {
     // TODO implement?
