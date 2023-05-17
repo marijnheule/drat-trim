@@ -1289,7 +1289,7 @@ int parse (struct solver* S) {
 
   S->maxRAT = INIT;
   S->RATset = (long*) malloc (sizeof (long) * S->maxRAT);
-  for (i = 0; i < S->maxRAT; i++) S->RATset[i] = 0; // is this required?
+  //for (i = 0; i < S->maxRAT; i++) S->RATset[i] = 0; // is this required?
 
   S->preRAT = (int*) malloc (sizeof (int) * n);
 

@@ -5,6 +5,11 @@
 #define stdin NULL
 #define RAND_MAX 0xffff
 
+#define malloc my_malloc
+#define realloc my_realloc
+#define free my_free
+#define memcpy my_memcpy
+
 typedef unsigned size_t;
 typedef int ssize_t;
 
@@ -43,10 +48,10 @@ void assert(int c)
 static unsigned char memory[MEMORY_SIZE];
 static unsigned char* bump_ptr = memory;
 
-void* malloc(unsigned size) {
-    unsigned aligned_size = (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1) + sizeof(unsigned);
+void* my_malloc(unsigned long size) {
+    unsigned long aligned_size = ((size + 3) & ~3) + 4;
 
-    if ((bump_ptr + aligned_size) > (memory + MEMORY_SIZE)) {
+    if (aligned_size > MEMORY_SIZE) {
         // TODO better to panic right away.
         // Out of memory
         return NULL;
@@ -60,9 +65,9 @@ void* malloc(unsigned size) {
     return (void*)((char*)allocated_mem + sizeof(unsigned));
 }
 
-void free(void* ptr) {}
+void my_free(void* ptr) {}
 
-void* memcpy(void* destination, const void* source, unsigned num) {
+void* my_memcpy(void* destination, const void* source, unsigned num) {
     unsigned char* dest = (unsigned char*)destination;
     const unsigned char* src = (const unsigned char*)source;
 
@@ -95,7 +100,7 @@ void* memcpy(void* destination, const void* source, unsigned num) {
     return destination;
 }
 
-void* realloc(void* ptr, unsigned size) {
+void* my_realloc(void* ptr, unsigned size) {
     if (ptr == NULL) {
         return malloc(size);
     }
