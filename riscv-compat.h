@@ -297,7 +297,6 @@ int long write(int fd, const void *buf, unsigned long count) {
         char c = ((const char*)buf)[i];
         putchar(c);
     }
-    while(1){}
 }
 
 #endif
