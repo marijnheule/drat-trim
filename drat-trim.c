@@ -93,7 +93,7 @@ static inline void printClause (int* clause) {
   while (*clause) printf ("%i ", *clause++); printf ("0\n"); }
 
 static inline void addWatchPtr (struct solver* S, int lit, long watch) {
-  if (S->used[lit] + 1 == S->max[lit]) { S->max[lit] *= 1.5;
+  if (S->used[lit] + 1 == S->max[lit]) { S->max[lit] = (S->max[lit] * 3) >> 1;
     S->wlist[lit] = (long *) realloc (S->wlist[lit], sizeof (long) * S->max[lit]);
     if (S->wlist[lit] == NULL) { printf("c MEMOUT: reallocation failed for watch list of %i\n", lit); exit (0); } }
   S->wlist[lit][ S->used[lit]++ ] = watch | S->mask;
