@@ -283,7 +283,23 @@ int fscanf_3(FILE* f, const char* format, int* a)
     return 0;
 }
 
+#ifdef RISCV_SIM
 extern int long write(int fd, const void *buf, unsigned long count);
+#else
+int putchar(int c) {
+    register unsigned value __asm__("a0") = (unsigned)c;
+    __asm__ volatile("ebreak" : : "r"(value));
+}
+
+int long write(int fd, const void *buf, unsigned long count) {
+    for (unsigned long i = 0; i < count; i++) {
+        char c = ((const char*)buf)[i];
+        putchar(c);
+    }
+    while(1){}
+}
+
+#endif
 
 // TODO do not ignore the actual values
 #define printf(fmt, ...) write(0, fmt, sizeof(fmt) + 1)
