@@ -40,7 +40,8 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 //#define PARTIALPROOF
 
 #define TIMEOUT     40000
-#define BIGINIT     1000000
+//#define BIGINIT     1000000
+#define BIGINIT     1000
 #define INIT        4
 #define END         0
 #define UNSAT       0
