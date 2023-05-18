@@ -60,11 +60,11 @@ struct solver { FILE *inputFile, *proofFile, *lratFile, *traceFile, *activeFile;
       *processed, *assigned, count, *used, *max, COREcount, RATmode, RATcount, nActive, *lratTable,
       nLemmas, maxRAT, *preRAT, maxDependencies, nDependencies, bar, backforce, reduce,
       *dependencies, maxVar, maxSize, mode, verb, unitSize, unitStackSize, prep, *current, nRemoved, warning,
-      delProof, *setMap, *setTruth;
+      delProof, *setMap, *setTruth, rupOnly;
     char *coreStr, *lemmaStr;
     struct timeval start_time;
     long mem_used, time, nClauses, nStep, nOpt, nAlloc, *unitStack, *reason, lemmas, nResolve, *RATset,
-         nReads, nWrites, lratSize, lratAlloc, *lratLookup, **wlist, *optproof, *formula, *proof;  };
+      nReads, nWrites, lratSize, lratAlloc, *lratLookup, **wlist, *optproof, *formula, *proof;  };
 
 static inline void assign (struct solver* S, int lit) {
   S->falseA[-lit] = 1; *(S->assigned++) = -lit; }
@@ -652,7 +652,9 @@ int redundancyCheck (struct solver *S, int *clause, int size, int mark) {
     return SUCCESS; }
 
   // Failed RUP check.  Now test RAT.
-  // printf ("RUP check failed.  Starting RAT check.\n");
+  if (S->rupOnly) {
+      printf ("\rc RUP check failed\n");
+      return FAILED; }
   int reslit = clause[PIVOT];
   if (S->verb)
     printf ("\rc RUP checked failed; starting RAT check on pivot %d.\n", reslit);
@@ -1342,6 +1344,7 @@ void printHelp ( ) {
   printf ("  -p          run in plain mode (i.e., ignore deletion information)\n\n");
   printf ("  -R          turn off reduce mode\n\n");
   printf ("  -S          run in SAT check mode (forward checking)\n\n");
+  printf ("  -U          Only allow RUP additions\n");
   printf ("and input and proof are specified as follows\n\n");
   printf ("  INPUT       input file in DIMACS format\n");
   printf ("  PROOF       proof file in DRAT format (stdin if no argument)\n\n");
@@ -1373,6 +1376,7 @@ int main (int argc, char** argv) {
   S.reduce     = 1;
   S.binMode    = 0;
   S.binOutput  = 0;
+  S.rupOnly    = 0;
   gettimeofday (&S.start_time, NULL);
 
   int i, tmp = 0;
@@ -1399,7 +1403,8 @@ int main (int argc, char** argv) {
       else if (argv[i][1] == 'p') S.delete     = 0;
       else if (argv[i][1] == 'R') S.reduce     = 0;
       else if (argv[i][1] == 'f') S.mode       = FORWARD_UNSAT;
-      else if (argv[i][1] == 'S') S.mode       = FORWARD_SAT; }
+      else if (argv[i][1] == 'S') S.mode       = FORWARD_SAT; 
+      else if (argv[i][1] == 'U') S.rupOnly    = 1; }
     else {
       tmp++;
       if (tmp == 1) {
