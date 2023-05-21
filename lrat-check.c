@@ -57,7 +57,7 @@ int *clsList, clsAlloc, clsLast;
 int *table, tableSize, tableAlloc, maskAlloc;
 int *litList, litCount, litAlloc;
 int *inBucket, *topTable;
-ltype topAlloc;
+int topAlloc; // ltype?
 
 int  getType   (int* list) { return list[1]; }
 int  getIndex  (int* list) { return list[0]; }
@@ -191,7 +191,7 @@ void addClause (int index, int* literals, int size, FILE* drat) {
   if (index >= topAlloc * BUCKET) {
     ltype old = topAlloc;
     topAlloc = (topAlloc * 3) >> 1;
-    printf ("c topTable reallocation from %lli to %lli\n", old, topAlloc);
+    printf ("c topTable reallocation from %i to %i\n", old, topAlloc);
     topTable = (int*) realloc (topTable, sizeof(int) * topAlloc);
     for (int j = old; j < topAlloc; j++) topTable[j] = -1; }
 
