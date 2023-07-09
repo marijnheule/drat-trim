@@ -1,6 +1,6 @@
 /************************************************************************************[lrat-check.c]
-Copyright (c) 2017-2022 Marijn Heule, Carnegie Mellon University
-Last edit: October 19, 2022
+Copyright (c) 2017-2023 Marijn Heule, Carnegie Mellon University
+Last edit: July 2023
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -369,8 +369,11 @@ int parseLine (FILE* file, int mode, int line) {
   return 0; }
 
 int main (int argc, char** argv) {
-  if (argc < 3)
+  if (argc < 2)
      usage(argv[0]);
+  if (argc == 2)
+    printf ("c expecting proof in stdin\n");
+
   struct timeval start_time, finish_time;
   int found_error = 0; // encountered an error?
   int found_empty_clause = 0; // encountered derivation of empty clause?
@@ -425,7 +428,9 @@ int main (int argc, char** argv) {
 
   printf ("c parsed a formula with %i variables and %i clauses\n", nVar, nCls);
 
-  FILE* proof = fopen (argv[2], "r");
+  FILE* proof = stdin;
+  if (argc > 2)
+    proof = fopen (argv[2], "r");
   if (!proof) {
     printf("c Couldn't open file '%s'\n", argv[2]);
     exit(1); }
