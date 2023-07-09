@@ -1,6 +1,6 @@
 /************************************************************************************[lrat-check.c]
 Copyright (c) 2017-2022 Marijn Heule, Carnegie Mellon University
-Last edit: October 19, 2022
+Last edit: December 20, 2022
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -40,11 +40,8 @@ void usage(char *name) {
   exit(0);
 }
 
-#ifdef LONGTYPE
-  typedef long long ltype;
-#else
-  typedef int ltype;
-#endif
+//typedef long long ltype;
+typedef int ltype;
 typedef int mtype;
 
 ltype added_clauses = 0;
@@ -59,8 +56,8 @@ int maxBucket;
 int *clsList, clsAlloc, clsLast;
 int *table, tableSize, tableAlloc, maskAlloc;
 int *litList, litCount, litAlloc;
-int *inBucket;
-int *topTable, topAlloc;
+int *inBucket, *topTable;
+int topAlloc; // ltype?
 
 int  getType   (int* list) { return list[1]; }
 int  getIndex  (int* list) { return list[0]; }
@@ -87,6 +84,7 @@ void printClause (int* clause) {
 int checkRedundancy (int pivot, int start, int *hints, ltype thisMask, int print) {
   int res = abs(*hints++);
   assert (start <= res);
+
 
   if (print) printf ("c check redundancy res: %i pivot: %i start: %i\n", res, printLit(pivot), start);
   if (res != 0) {
@@ -132,6 +130,8 @@ int checkClause (int* list, int size, int* hints, int print) {
   now++;
   int pivot = convertLit (list[0]);
 
+
+
   int RATs = getRATs (hints + 1); // the number of negated hints
   for (int i = 0; i < size; i++) { // assign all literals in the clause to false
     int clit = convertLit (list[i]);
@@ -146,7 +146,6 @@ int checkClause (int* list, int size, int* hints, int print) {
     mask [clit] = now + RATs; } // mark all literals in lemma with mask
 
   int res = checkRedundancy (pivot, 0, hints, now + RATs, print);
-
   if (res == CONFLICT) { return SUCCESS; }
   if (res == FAILED  ) { return FAILED;  }
 
@@ -154,7 +153,6 @@ int checkClause (int* list, int size, int* hints, int print) {
   int start = intro[pivot ^ 1];
 
   if (RATs == 0)      {
-    if (res == SUCCESS) return FAILED; // No RAT and no conflict is FAILED
     if (print) printf ("c start %i first %i\n", start, -first[0]);
     if (start != 0) return FAILED;
     return SUCCESS; }
@@ -167,6 +165,7 @@ int checkClause (int* list, int size, int* hints, int print) {
         if (clit == (pivot^1)) return FAILED; } }
     start++; }
   intro[pivot ^ 1] = -first[0];
+
 
   if (start == 0) return SUCCESS;
   while (1) {
@@ -190,11 +189,10 @@ void addClause (int index, int* literals, int size, FILE* drat) {
 
 //  printf ("c index %i\n", index);
   if (index >= topAlloc * BUCKET) {
-    int old = topAlloc;
+    ltype old = topAlloc;
     topAlloc = (topAlloc * 3) >> 1;
     printf ("c topTable reallocation from %i to %i\n", old, topAlloc);
     topTable = (int*) realloc (topTable, sizeof(int) * topAlloc);
-    if (!topTable) { printf ("c Memory allocation failure of topTable\n"); exit (1); }
     for (int j = old; j < topAlloc; j++) topTable[j] = -1; }
 
   int count = 0, bucket = topTable[index/BUCKET];
@@ -211,10 +209,8 @@ void addClause (int index, int* literals, int size, FILE* drat) {
     maxBucket = (maxBucket * 3) >> 1;
     printf ("c increasing the number of buckets from %i to %i\n", bucket, maxBucket);
     inBucket = (int*) realloc (inBucket, sizeof(int) * maxBucket);
-    if (!inBucket) { printf ("c Memory allocation failure of inBucket\n"); exit (1); }
     for (int j = bucket; j < maxBucket; j++) inBucket[j] = 0;
     clsList = (int*) realloc (clsList, sizeof(int) * maxBucket * BUCKET);
-    if (!clsList) { printf ("c Memory allocation failure of clsList\n"); exit (1); }
     for (int i = bucket * BUCKET; i < maxBucket * BUCKET; i++) clsList[i] = DELETED; // is this required?
   }
 
@@ -222,9 +218,7 @@ void addClause (int index, int* literals, int size, FILE* drat) {
 
   if (tableSize + size >= tableAlloc) {
     tableAlloc = (tableAlloc * 3) >> 1;
-    table = (int*) realloc (table, sizeof (int) * tableAlloc);
-    if (!table) { printf ("c Memory allocation failure of table\n"); exit (1); }
-  }
+    table = (int*) realloc (table, sizeof (int) * tableAlloc); }
 
   setClause (index, tableSize);
   for (int i = 0; i < size; i++) {
@@ -305,9 +299,7 @@ void compress (int index, int print) {
 static void addLit (int lit) {
   if (litCount >= litAlloc) {
     litAlloc = (litAlloc * 3) >> 1;
-    litList = (int*) realloc (litList, sizeof (int) * litAlloc);
-    if (!litList) { printf ("c Memory allocation failure of litList\n"); exit (1); }
-  }
+    litList = (int*) realloc (litList, sizeof (int) * litAlloc); }
   litList[litCount++] = lit; }
 
 int parseLine (FILE* file, int mode, int line) {
@@ -339,10 +331,8 @@ int parseLine (FILE* file, int mode, int line) {
     int index;
     int zeros = 2;
     tmp = fscanf (file, " %i ", &index);
-//    printf ("%lli ", index);
-//    assert (index > 0);
     if (tmp == 0 || tmp == EOF) return 0;
-    addLit ((int) index);
+    addLit (index);
 
     tmp = fscanf (file, " d %i ", &lit);
     if (tmp == 1) {
@@ -369,11 +359,14 @@ int parseLine (FILE* file, int mode, int line) {
   return 0; }
 
 int main (int argc, char** argv) {
-  if (argc < 3)
+  if (argc < 2)
      usage(argv[0]);
+
+  if (argc == 2)
+    printf ("c only one file provided, assume proof from stdin\n");
+
   struct timeval start_time, finish_time;
-  int found_error = 0; // encountered an error?
-  int found_empty_clause = 0; // encountered derivation of empty clause?
+  int return_code = 0;
   gettimeofday(&start_time, NULL);
   now = 0, clsLast = 0;
 
@@ -391,8 +384,6 @@ int main (int argc, char** argv) {
     int j; for (j = 0; j < 1024; j++) { if (ignore[j] == '\n') break; }
     if (j == 1024) {
       printf ("c ERROR: comment longer than 1024 characters: %s\n", ignore); exit (0); } }
-
-  if (nVar <= 0) nVar = 1;
 
   topAlloc = INIT;
   topTable = (int*) malloc (sizeof(int) * topAlloc);
@@ -419,13 +410,19 @@ int main (int argc, char** argv) {
   int index = 1;
   while (1) {
     int size = parseLine (cnf, CNF, index);
+    if (size == 1) {
+      printf ("c formula contains empty clause\n");
+      printf ("s VERIFIED\n");
+      break; }
     if (size == 0) break;
     addClause (index++, litList, size, NULL); }
   fclose (cnf);
 
   printf ("c parsed a formula with %i variables and %i clauses\n", nVar, nCls);
 
-  FILE* proof = fopen (argv[2], "r");
+  FILE* proof = stdin;
+  if (argc > 2)
+    proof = fopen (argv[2], "r");
   if (!proof) {
     printf("c Couldn't open file '%s'\n", argv[2]);
     exit(1); }
@@ -462,30 +459,17 @@ int main (int argc, char** argv) {
       else {
         printf("c failed while checking clause: "); printClause (litList + 2);
         checkClause (litList + 2, length, hints, 1);
-        found_error = 1;
+        printf("s DERIVATION\n");
+        return_code = 1;
         break;
       }
       if (length == 0)
-        found_empty_clause = 1;
+        printf ("c VERIFIED\n");
     }
     else {
       printf ("c failed type\n");
-      found_error = 1;
-      break;
+      return_code = 1;
     }
-  }
-
-  int return_code;
-  if (found_empty_clause && !found_error) {
-    printf ("c VERIFIED\n");
-    return_code = 0;
-  } else {
-    if (!found_error) {
-      // print why the proof failed
-      printf ("c checking ended before empty clause was found\n");
-    }
-    printf ("c NOT VERIFIED\n");
-    return_code = 1;
   }
 
   printf ("c allocated %i %i %i\n", maxBucket, tableAlloc, litAlloc);
