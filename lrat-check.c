@@ -359,8 +359,12 @@ int parseLine (FILE* file, int mode, int line) {
   return 0; }
 
 int main (int argc, char** argv) {
-  if (argc < 3)
+  if (argc < 2)
      usage(argv[0]);
+
+  if (argc == 2)
+    printf ("c only one file provided, assume proof from stdin\n");
+
   struct timeval start_time, finish_time;
   int return_code = 0;
   gettimeofday(&start_time, NULL);
@@ -416,7 +420,9 @@ int main (int argc, char** argv) {
 
   printf ("c parsed a formula with %i variables and %i clauses\n", nVar, nCls);
 
-  FILE* proof = fopen (argv[2], "r");
+  FILE* proof = stdin;
+  if (argc > 2)
+    proof = fopen (argv[2], "r");
   if (!proof) {
     printf("c Couldn't open file '%s'\n", argv[2]);
     exit(1); }
