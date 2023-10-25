@@ -470,8 +470,8 @@ int main (int argc, char** argv) {
         found_error = 1;
         break;
       }
-      if (length == 0)
-        found_empty_clause = 1;
+      if (length == 0) {
+        found_empty_clause = 1; }
     }
     else {
       printf ("c failed type\n");
@@ -485,10 +485,9 @@ int main (int argc, char** argv) {
     printf ("c VERIFIED\n");
     return_code = 0;
   } else {
-    if (!found_error) {
-      // print why the proof failed
-      printf ("c checking ended before empty clause was found\n");
-    }
+//    if (!found_error) {
+//    }
+    printf("c WARNING: Verification incomplete. Last line checked = %d\n", line);
     printf ("c NOT VERIFIED\n");
     return_code = 1;
   }
