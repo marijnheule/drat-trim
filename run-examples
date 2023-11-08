@@ -1,6 +1,19 @@
+#!/bin/bash
+
+# fail on error
+set -e
+
+# show what we're actually doing
+set -x
+
+# build
 make
+
+# run plain examples
 ./drat-trim examples/example-4-vars.cnf examples/example-4-vars.drat
 ./drat-trim examples/example-5-vars.cnf examples/example-5-vars.drat
+
+# run proofs creating cores and lemmas
 ./drat-trim examples/uuf-100-1.cnf examples/uuf-100-1.drat -c core -l lemmas
 ./drat-trim core lemmas
 ./drat-trim examples/uuf-100-2.cnf examples/uuf-100-2.drat -c core -l lemmas
@@ -11,5 +24,13 @@ make
 ./drat-trim core lemmas
 ./drat-trim examples/uuf-100-5.cnf examples/uuf-100-5.drat -c core -l lemmas
 ./drat-trim core lemmas
+
+# run examples with comments in proofs
+./drat-trim examples/example-5-vars.cnf examples/example-5-vars-comments1.drat
+./drat-trim examples/example-5-vars.cnf examples/example-5-vars-comments2.drat
+./drat-trim examples/example-5-vars.cnf examples/example-5-vars-comments3.drat
+./drat-trim examples/example-5-vars.cnf examples/example-5-vars-comments4.drat
+
+# cleanup
 rm core
 rm lemmas
