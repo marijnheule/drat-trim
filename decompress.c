@@ -23,7 +23,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #define ADD	-48
 #define DEL	50
-#define MODE	1	// DRAT: MODE=1; LRAT: MODE=2
+#define MODE	2	// DRAT: MODE=1; LRAT: MODE=2
 
 #ifdef LONGTYPE
   typedef long long ltype;
@@ -62,7 +62,10 @@ int main (int argc, char** argv) {
       int zeros = 0;
       read_lit (input, &lit);
       index = lit;
-      printf ("%lli ", (long long) index);
+      if (MODE == 2) {
+        if (index > 0) printf ("%lli ", (long long) 2 *  index    );
+        else           printf ("%lli ", (long long) 2 * -index + 1); }
+      else printf ("%lli ", (long long) index);
       while (zeros < MODE) {
         read_lit (input, &lit);
         if (lit == 0) zeros++;
@@ -70,7 +73,9 @@ int main (int argc, char** argv) {
         else printf ("%lli ", (long long) lit); }
     }
     else if (lit == DEL) {
-      if (MODE == 2) printf ("%lli ", (long long) index);
+      if (MODE == 2) {
+        if (index > 0) printf ("%lli ", (long long) 2 *  index    );
+        else           printf ("%lli ", (long long) 2 * -index + 1); }
       printf ("d ");
       int zeros = 0;
       while (zeros < 1) {
