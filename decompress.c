@@ -1,6 +1,6 @@
 /**********************************************************************************[decompress.c]
-Copyright (c) 2020 Marijn Heule, Carnegie Mellon University
-Last edit: September 5, 2020
+Copyright (c) 2020-2023 Marijn Heule, Carnegie Mellon University
+Last edit: November 16, 2023
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -44,15 +44,22 @@ int read_lit (FILE* input, ltype *lit) {
   else       *lit = (l >> 1);
   return 1; }
 
-
 int main (int argc, char** argv) {
+  int mode = MODE;
+  FILE *input;
 
   if (argc <= 1) {
-    printf("c %s needs one argument: an input in compressed LRAT format\n", argv[0]);
+    printf("c %s needs one argument: an input in compressed DRAT/LRAT format\n", argv[0]);
     return 0; }
 
-  FILE *input  = fopen (argv[1], "r");
-  if (input == NULL) { printf ("c ERROR opening %s\n", argv[1]); exit (1); }
+
+  for (int i = 1; i < argc; i++) {
+    if (argv[i][0] == '-' && argv[i][1] == 'm') {
+      mode = 3 - mode; }
+    else {
+      input = fopen (argv[i], "r");
+      if (input == NULL) { printf ("c ERROR opening %s\n", argv[i]); exit (1); } }
+    }
 
   ltype lit, index;
 
@@ -62,18 +69,18 @@ int main (int argc, char** argv) {
       int zeros = 0;
       read_lit (input, &lit);
       index = lit;
-      if (MODE == 2) {
+      if (mode == 2) {
         if (index > 0) printf ("%lli ", (long long) 2 *  index    );
         else           printf ("%lli ", (long long) 2 * -index + 1); }
       else printf ("%lli ", (long long) index);
-      while (zeros < MODE) {
+      while (zeros < mode) {
         read_lit (input, &lit);
         if (lit == 0) zeros++;
-        if (zeros == MODE) printf ("0\n");
+        if (zeros == mode) printf ("0\n");
         else printf ("%lli ", (long long) lit); }
     }
     else if (lit == DEL) {
-      if (MODE == 2) {
+      if (mode == 2) {
         if (index > 0) printf ("%lli ", (long long) 2 *  index    );
         else           printf ("%lli ", (long long) 2 * -index + 1); }
       printf ("d ");
