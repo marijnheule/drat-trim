@@ -33,7 +33,6 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 long long table_size, table_alloc, *lookup;
 ltype lookup_size, lookup_alloc, *table;
 
-
 int abscompare (const void *a, const void *b) {
 #ifdef LONGTYPE
   return (llabs(*(ltype*)a) - llabs(*(ltype*)b)); }
