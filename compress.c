@@ -133,7 +133,7 @@ int main (int argc, char** argv) {
 
       ltype* start = list; int count = 0;
       while (*list) { count++; list++; }
-      qsort (start, count, sizeof (ltype), abscompare);
+//      qsort (start, count, sizeof (ltype), abscompare);
 
       list = start;
       while (*list) write_lit (output, *list++, 0);
