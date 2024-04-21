@@ -23,7 +23,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #define ADD	-48
 #define DEL	50
-#define MODE	2	// DRAT: MODE=1; LRAT: MODE=2
+#define MODE	1	// DRAT: MODE=1; LRAT: MODE=2
 
 #ifdef LONGTYPE
   typedef long long ltype;
@@ -37,6 +37,7 @@ int read_lit (FILE* input, ltype *lit) {
   do {
     lc = getc_unlocked (input);
     if ((shift == 0) && (lc == EOF)) return EOF;
+    printf ("%i\n", lc);
     l |= (ltype) (lc & 127) << shift;
     shift += 7; }
   while (lc > 127);
