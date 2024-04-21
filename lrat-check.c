@@ -89,8 +89,8 @@ int checkRedundancy (int pivot, int start, int *hints, ltype thisMask, int print
   assert (start <= res);
 
   if (print) printf ("c check redundancy res: %i pivot: %i start: %i\n", res, printLit(pivot), start);
-  if (res != 0) {
-    while (start < res) {
+  if (res != 0) { // if resolvent is non-empty
+    while (start < res) { // check whether all clasues before the hint are tautologies
       if (getClause(start++) != DELETED) {
         int *clause = table + getClause(start-1);
         while (*clause) {
@@ -98,7 +98,7 @@ int checkRedundancy (int pivot, int start, int *hints, ltype thisMask, int print
           if (clit == (pivot^1)) { printf ("c FAILED tautology %i\n", pivot); return FAILED; } } } }
     if (getClause(res) == DELETED) { printf ("c ERROR: using DELETED clause %i\n", res); return FAILED; };
     int flag = 0, *clause = table + getClause(res);
-    while (*clause) {
+    while (*clause) { // find the pivot
       int clit = convertLit (*clause++);
       if (clit == (pivot^1)) { flag = 1; continue; }
       if (mask[clit  ] >= thisMask) continue;       // lit is falsified
@@ -125,7 +125,10 @@ int checkRedundancy (int pivot, int start, int *hints, ltype thisMask, int print
     if (mask[unit^1] == thisMask) printf ("c WARNING hint already satisfied in lemma with index %lli\n", (long long) lastIndex);
     mask[unit^1] = thisMask; }
 
-  if (res == 0) return SUCCESS;
+  if (res == 0) {
+    if (print) printf ("c SUCCESS\n");
+    return SUCCESS;
+  }
   return FAILED; }
 
 int checkClause (int* list, int size, int* hints, int print) {
@@ -154,7 +157,7 @@ int checkClause (int* list, int size, int* hints, int print) {
   int start = intro[pivot ^ 1];
 
   if (RATs == 0)      {
-    if (res == SUCCESS) return FAILED; // No RAT and no conflict is FAILED
+//    if (res == SUCCESS) return FAILED; // No RAT and no conflict is FAILED
     if (print) printf ("c start %i first %i\n", start, -first[0]);
     if (start != 0) return FAILED;
     return SUCCESS; }
