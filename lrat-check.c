@@ -57,10 +57,11 @@ ltype *mask, *intro, now, lastIndex;
 int maxBucket;
 
 int *clsList, clsAlloc, clsLast;
-int *table, tableSize, tableAlloc, maskAlloc;
+int *table, tableSize;
+long long int tableAlloc, maskAlloc;
 int *litList, litCount, litAlloc;
 int *inBucket;
-int *topTable, topAlloc;
+int *topTable; long long int topAlloc;
 
 int  getType   (int* list) { return list[1]; }
 int  getIndex  (int* list) { return list[0]; }
@@ -193,9 +194,9 @@ void addClause (int index, int* literals, int size, FILE* drat) {
 
 //  printf ("c index %i\n", index);
   if (index >= topAlloc * BUCKET) {
-    int old = topAlloc;
+    long long int old = topAlloc;
     topAlloc = (topAlloc * 3) >> 1;
-    printf ("c topTable reallocation from %i to %i\n", old, topAlloc);
+    printf ("c topTable reallocation from %lli to %lli\n", old, topAlloc);
     topTable = (int*) realloc (topTable, sizeof(int) * topAlloc);
     if (!topTable) { printf ("c Memory allocation failure of topTable\n"); exit (1); }
     for (int j = old; j < topAlloc; j++) topTable[j] = -1; }
@@ -224,6 +225,7 @@ void addClause (int index, int* literals, int size, FILE* drat) {
   topTable[index/BUCKET] = bucket;
 
   if (tableSize + size >= tableAlloc) {
+//    printf ("c table realloc %lli\n", tableAlloc);
     tableAlloc = (tableAlloc * 3) >> 1;
     table = (int*) realloc (table, sizeof (int) * tableAlloc);
     if (!table) { printf ("c Memory allocation failure of table\n"); exit (1); }
@@ -411,7 +413,7 @@ int main (int argc, char** argv) {
   for (int i = 0; i < maxBucket * BUCKET; i++) clsList[i] = DELETED;
 
   tableSize  = 0;
-  tableAlloc = nCls * 2;
+  tableAlloc = (long long int) nCls * 2;
   table = (int *) malloc (sizeof(int) * tableAlloc);
 
   litAlloc = nVar * 10;
@@ -495,7 +497,7 @@ int main (int argc, char** argv) {
     return_code = 1;
   }
 
-  printf ("c allocated %i %i %i\n", maxBucket, tableAlloc, litAlloc);
+  printf ("c allocated %i %lli %i\n", maxBucket, tableAlloc, litAlloc);
 
   gettimeofday(&finish_time, NULL);
   double secs = (finish_time.tv_sec + 1e-6 * finish_time.tv_usec) -
