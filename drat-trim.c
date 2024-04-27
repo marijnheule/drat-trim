@@ -1358,7 +1358,7 @@ void printHelp ( ) {
   exit (0); }
 
 int binChar (int c) {
-  // ASCII characters: 13 (CR), 32 (' '), 45 ('-'), 48 ('0'), 57 ('9'), 99 ('c'), 100 ('d')
+  // ASCII characters: 10 (LF), 13 (CR), 32 (' '), 45 ('-'), 48 ('0'), 57 ('9'), 99 ('c'), 100 ('d')
   if ((c != 10) && (c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (c != 99) && (c != 100))
     return 1;
   return 0;
