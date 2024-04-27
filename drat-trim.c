@@ -1251,7 +1251,7 @@ int parse (struct solver* S) {
         S->proof[S->nStep++] = (((long) (clause - S->DB)) << INFOBITS) + 1; } } }
 
   S->DB = (int *) realloc (S->DB, S->mem_used * sizeof (int));
-  if (S->DB == NULL) { printf("c MEMOUT: reallocation of DB failed\n"); exit (0); }
+  if (S->mem_used && S->DB == NULL) { printf("c MEMOUT: reallocation of DB failed\n"); exit (0); }
 
   for (i = 0; i < BIGINIT; i++) free (hashTable[i]);
   free (hashTable);
@@ -1260,7 +1260,7 @@ int parse (struct solver* S) {
   free (buffer);
 
   int *clause = &S->DB[finalClause];
-  clause[ID] |= ACTIVE; // temporary
+  if (clause) clause[ID] |= ACTIVE; // temporary
 
   printf ("\rc finished parsing");
   if (S->nReads) printf (", read %li bytes from proof file", S->nReads);
@@ -1359,7 +1359,7 @@ void printHelp ( ) {
 
 int binChar (int c) {
   // ASCII characters: 13 (CR), 32 (' '), 45 ('-'), 48 ('0'), 57 ('9'), 99 ('c'), 100 ('d')
-  if ((c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (c != 99) && (c != 100))
+  if ((c != 10) && (c != 13) && (c != 32) && (c != 45) && ((c < 48) || (c > 57)) && (c != 99) && (c != 100))
     return 1;
   return 0;
 }
