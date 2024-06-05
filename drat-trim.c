@@ -1095,7 +1095,7 @@ int parse (struct solver* S) {
     hashTable[i] = (long*) malloc (sizeof (long) * hashMax[i]); }
 
   int fileSwitchFlag = 0;
-  int finalClause = 0;
+  long finalClause = 0;
   size = 0;
   while (1) {
     int lit = 0; tmp = 0;
