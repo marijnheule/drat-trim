@@ -18,6 +18,9 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
+// get 'getc_unlocked' on glibc
+#define _POSIX_C_SOURCE 199506L
+
 #include <stdio.h>
 #include <stdlib.h>
 
