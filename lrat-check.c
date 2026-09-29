@@ -153,6 +153,7 @@ int checkClause (int* list, int size, int* hints, int print) {
 
   if (res == CONFLICT) { return SUCCESS; }
   if (res == FAILED  ) { return FAILED;  }
+  if (size == 0) return FAILED; // an empty lemma is only valid if the hints reach a conflict
 
   int *first = hints; first++; while (*first > 0) first++;
   int start = intro[pivot ^ 1];
