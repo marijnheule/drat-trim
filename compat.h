@@ -18,10 +18,12 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
-#ifndef WINDOWS_COMPAT_H
-#define WINDOWS_COMPAT_H
+#ifndef COMPAT_H
+#define COMPAT_H
 
-/* A minimal compatibility header when building on windows operating system */
+/* A minimal compatibility header when building on windows and modern linux operating system */
+
+#define _POSIX_C_SOURCE 200112L
 
 #if defined(_WIN32) || defined(_WIN64)
 #define putc_unlocked _putc_nolock
@@ -30,4 +32,4 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define getchar_unlocked _getchar_nolock
 #endif
 
-#endif /* WINDOWS_COMPAT_H */
+#endif /* COMPAT_H */
